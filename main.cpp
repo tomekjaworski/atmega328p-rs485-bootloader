@@ -7,7 +7,7 @@
 
 #include <avr/io.h>
 #include <avr/fuse.h>
-#include <avr/boot.h>
+#include "boot.h"
 
 FUSES =
 {
