@@ -1,0 +1,22 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Atmel Studio Solution File, Format Version 11.00
+VisualStudioVersion = 14.0.25420.1
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{E66E83B9-2572-4076-B26E-6BE79FF3018A}") = "atmega328p_bootloader", "atmega328p_bootloader.cppproj", "{CF94DB04-8A71-4C3C-BC60-CAB6CE2CB609}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|AVR = Debug|AVR
+		Release|AVR = Release|AVR
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{CF94DB04-8A71-4C3C-BC60-CAB6CE2CB609}.Debug|AVR.ActiveCfg = Debug|AVR
+		{CF94DB04-8A71-4C3C-BC60-CAB6CE2CB609}.Debug|AVR.Build.0 = Debug|AVR
+		{CF94DB04-8A71-4C3C-BC60-CAB6CE2CB609}.Release|AVR.ActiveCfg = Release|AVR
+		{CF94DB04-8A71-4C3C-BC60-CAB6CE2CB609}.Release|AVR.Build.0 = Release|AVR
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
