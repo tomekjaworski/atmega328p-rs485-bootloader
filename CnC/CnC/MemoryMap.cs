@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -97,6 +98,12 @@ namespace CnC
             }
         }
 
+        public void Write(uint address, byte[] data, int offset, int count)
+        {
+            for (int i = 0; i < count; i++)
+                this.Write(address++, data[offset + i]);
+        }
+
         #endregion
 
         #region Read routines
@@ -169,5 +176,47 @@ namespace CnC
             return value;
         }
         #endregion
+
+        public void Dump(string filename)
+        {
+            int bytes_per_row = 16;
+
+            int address = 0;
+            int bytes_left = this.mem.Length;
+            using (FileStream fs = File.Create(filename))
+            using (StreamWriter sw = new StreamWriter(fs, Encoding.ASCII)) {
+
+                while (bytes_left > 0) {
+                    sw.Write("{0:X8} ", address);
+
+                    int to_read = Math.Min(bytes_per_row, bytes_left);
+
+                    // dump data in hex
+                    for (int i = 0; i < to_read; i++)
+                        sw.Write("{0:X2} ", this.mem[address + i]);
+
+                    // dump data in ascii
+                    for (int i = 0; i < to_read; i++)
+                        if (this.mem[address + i] >= 32 && this.mem[address + i] <= 126)
+                            sw.Write((char)this.mem[address + i]);
+                    else
+                            sw.Write(".");
+                    sw.Write(" ");
+
+                    // dump dirty flag
+                    for (int i = 0; i < to_read; i++)
+                        if (this.dirty[address + i])
+                            sw.Write('D');
+                        else
+                            sw.Write('.');
+
+                    address += to_read;
+                    bytes_left -= to_read;
+                    sw.WriteLine("");
+                }
+
+            }
+            //
+        }
     }
 }

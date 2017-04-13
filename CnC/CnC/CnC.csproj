@@ -43,6 +43,11 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ByteOrder.cs" />
+    <Compile Include="IntelHEXFormatException.cs" />
+    <Compile Include="IntelHEX16Storage.cs" />
+    <Compile Include="MemoryMap.cs" />
+    <Compile Include="MemoryMapException.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
