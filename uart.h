@@ -20,6 +20,22 @@ inline uint8_t uartReceive()
 	return UDR0;
 }
 
+inline int uartReceiveNoBlock()
+{
+	if (!(UCSR0A & _BV(RXC0))) // no data
+		return -1;
+
+	return UDR0;
+}
+
+inline bool uartReceiveNoBlock(uint8_t& data)
+{
+	if (!(UCSR0A & _BV(RXC0))) // no data
+		return false;
+
+	data = UDR0;
+	return true;
+}
 
 inline uint8_t uartSend(uint8_t data)
 {

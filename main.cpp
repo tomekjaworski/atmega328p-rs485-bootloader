@@ -7,13 +7,15 @@
 
 #include <avr/io.h>
 #include <util/crc16.h>
+#include <util/delay.h>
 #include "boot.h"
 #include "uart.h"
 
+#define BOOTLOADER_HARDWARE_ADDRESS	0x51
 
 //const char *block = "AABBCCDDEEFFGGHHIIJJKKLLMMNNOOPPPPOOIIAABBCCDDEEFFGGHHIIJJKKLLMMNNOOPPPPOOIIAABBCCDDEEFFGGHHIIJJKKLLMMNNOOPPPPOOIIAABBCCDDEEFFGGHHIIJJKKLLMMNNOOPPPPOOIIAABBCCDDEEFFGGHHIIJJKKLLMMNNOOPPPPOOIIAABBCCDDEEFFGGHHIIJJKKLLMMNNOOPPPPOOIIAABBCCDDEEFFGGHHIIJJKKLLMMNN"; // 78a0
-  const char *block = "AABBCCDDEEFFGGHHIIJJKKLLMMNNOOPPPPOOIIAABBCCDDEEFFGGHHIIJJKKLLMMNNOOPPPPOOIIAABBCCDDEEFFGGHHIIJJKKLLMMNNOOPPPPOOIIAABBCCDDEEFFGGHHIIJJKKLLMMNNOOPPPPOOIIAABBCCDDEEFFGGHHIIJJKKLLMMNNOOPPPPOOIIAABBCCDDEEFFGGHHIIJJKKLLMMNNOOPPPPOOIIAABBCCDDEEFFGGHHIIJJKKLLMMNA@DE@\x49\x40\x4a\x4d"; // 78a0
-const char* p = block;
+  //const char *block = "AABBCCDDEEFFGGHHIIJJKKLLMMNNOOPPPPOOIIAABBCCDDEEFFGGHHIIJJKKLLMMNNOOPPPPOOIIAABBCCDDEEFFGGHHIIJJKKLLMMNNOOPPPPOOIIAABBCCDDEEFFGGHHIIJJKKLLMMNNOOPPPPOOIIAABBCCDDEEFFGGHHIIJJKKLLMMNNOOPPPPOOIIAABBCCDDEEFFGGHHIIJJKKLLMMNNOOPPPPOOIIAABBCCDDEEFFGGHHIIJJKKLLMMNA@DE@90AD"; // 78a0
+//const char* p = block;
 
 #define LED_ON do { PORTB |= _BV(PORTB5); } while (0);
 #define LED_OFF do { PORTB &= ~_BV(PORTB5); } while (0);
@@ -31,12 +33,6 @@ const char* p = block;
 #define RS485_DIR_RECEIVE	do { PORTD &= ~_BV(PORTD2); } while(0);//0
 
 
-bool receive_byte(uint8_t& ch)
-{
-	ch = *p++;
-	return true;
-}
-
 uint16_t crc16_update(uint16_t crc, uint8_t data)
 {
 	return _crc16_update(crc, data);
@@ -52,7 +48,7 @@ union PAGE_DATA {
 } page = {};
 
 
-bool receive_page(void)
+uint8_t receive_page(void)
 {
 	uint16_t crc = 0xffff;
 	uint8_t *pdata = (uint8_t *)&page;
@@ -60,17 +56,13 @@ bool receive_page(void)
 	int cnt = sizeof(uint16_t) + SPM_PAGESIZE + sizeof(uint16_t);
 	for (; cnt > 0; cnt--)
 	{
-		uint8_t high, low;
-
-		if (!receive_byte(high))
-			return false; 
-		if (!receive_byte(low))
-			return false;
+		uint8_t high = uartReceive();
+		uint8_t low = uartReceive();
 
 		if (high < '@' || high > 'P')
-			return false;
+			return 0x01; // error - format 
 		if (low < '@' || low > 'P')
-			return false;
+			return 0x02; // error - format
 
 		uint8_t b = (uint8_t)(high - '@') << 4 | (uint8_t)(low - '@');
 		*pdata++ = b;
@@ -83,55 +75,81 @@ bool receive_page(void)
 	}
 
 	// check CRC 16
-	return crc == page.crc;
+	if (crc != page.crc)
+		return 0x03; // error - CRC
+
+	return 0x00;
 }
-  /*
-  int
-  checkcrc(void)
-  {
-	  uint16_t crc = 0xffff, i;
 
-	  for (i = 0; i < sizeof serno; i++)
-	  crc = crc16_update(crc, serno[i]);
-
-	  return crc; // must be 0
-  }*/
+void txt(const char* ptr)
+{
+	RS485_DIR_SEND;
+	while(*ptr)
+		uartSend(*ptr++);
+	RS485_DIR_RECEIVE;
+}
 
 int main(void)
 {
 	uartInitialize();
-		
-	//bootInitialize();
+	bootInitialize();
 
-		while(1){
-		//LED_TOGGLE;
-		//for (int i = 0; i < 20000; i++)
-		//	asm volatile ("nop");
+	RS485_DIR_RECEIVE;
+	uint16_t wait_counter = 0;
+	//txt("Start\r\n");
+	while(1) {
 
-			uartSend('A');
-			uartSend('B');
-			uartSend('C');
-			uartSend('D');
-			uartSend('E');
-			uartSend('F');
-			uartSend('G');
-			uartSend('H');
-			{
-
-			
-		for (int i = 0; i < 20000; i++)
-			asm volatile ("nop");
-			}
+		// wait for advert
+		int adv = uartReceiveNoBlock();
+		if (adv == 'A' ) // advert received
+		{
+			//txt("Bootloader mode\r\n");
+			break;
 		}
 
+		_delay_ms(1);
+		if (wait_counter++ > 2000) // wait 2 secs
+		{
+			while(1) { txt("User program\r\n"); 	_delay_ms(500); }
+		}
+	}
+
+	
+	while(1)
+	{
+		uint8_t cmd = uartReceive();
+
+		if (cmd == 'C') // got challenge, send response
+		{
+			_delay_ms((int)BOOTLOADER_HARDWARE_ADDRESS << 3); // wait some time
+			RS485_DIR_SEND;
+			uartSend('c');
+			uartSend(BOOTLOADER_HARDWARE_ADDRESS);
+			RS485_DIR_RECEIVE;
+		}
+
+		if (cmd == 'R') // restart whole device
+			bootRestart();
+
+		if (cmd == 'P') { // receive a page
+			uint8_t addr = uartReceive();
+			uint8_t res = receive_page();
+
+			//if (addr != )
+			RS485_DIR_SEND;
+			uartSend('p');
+			uartSend(0xF0 | res);
+			RS485_DIR_RECEIVE;
+		}
+	}
 
 
-
+/*
 	uint32_t page = 0;
 	receive_page();
 
 	bootRestart();
-
+	*/
 	while(1)
 		asm("nop");
 	

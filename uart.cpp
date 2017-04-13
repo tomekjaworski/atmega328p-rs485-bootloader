@@ -51,5 +51,6 @@
 	 UCSR0B = _BV(RXEN0) | _BV(TXEN0);	// trun on RX and TX part of the serial controller
 	 //UCSR0B |= (1 << RXCIE0);
 
-	 RS485_DIR_SEND;
+	RS485_DIR_RECEIVE;
+
  }
