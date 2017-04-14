@@ -8,10 +8,11 @@
 #include <avr/io.h>
 #include <util/crc16.h>
 #include <util/delay.h>
+#include <avr/pgmspace.h>
 #include "boot.h"
 #include "uart.h"
 
-#define BOOTLOADER_HARDWARE_ADDRESS	0x51
+#define BOOTLOADER_HARDWARE_ADDRESS	(uint8_t)0x51
 
 //const char *block = "AABBCCDDEEFFGGHHIIJJKKLLMMNNOOPPPPOOIIAABBCCDDEEFFGGHHIIJJKKLLMMNNOOPPPPOOIIAABBCCDDEEFFGGHHIIJJKKLLMMNNOOPPPPOOIIAABBCCDDEEFFGGHHIIJJKKLLMMNNOOPPPPOOIIAABBCCDDEEFFGGHHIIJJKKLLMMNNOOPPPPOOIIAABBCCDDEEFFGGHHIIJJKKLLMMNNOOPPPPOOIIAABBCCDDEEFFGGHHIIJJKKLLMMNN"; // 78a0
   //const char *block = "AABBCCDDEEFFGGHHIIJJKKLLMMNNOOPPPPOOIIAABBCCDDEEFFGGHHIIJJKKLLMMNNOOPPPPOOIIAABBCCDDEEFFGGHHIIJJKKLLMMNNOOPPPPOOIIAABBCCDDEEFFGGHHIIJJKKLLMMNNOOPPPPOOIIAABBCCDDEEFFGGHHIIJJKKLLMMNNOOPPPPOOIIAABBCCDDEEFFGGHHIIJJKKLLMMNNOOPPPPOOIIAABBCCDDEEFFGGHHIIJJKKLLMMNA@DE@90AD"; // 78a0
@@ -32,50 +33,52 @@
 #define RS485_DIR_SEND		do { PORTD |= _BV(PORTD2); } while(0); //1
 #define RS485_DIR_RECEIVE	do { PORTD &= ~_BV(PORTD2); } while(0);//0
 
-
-uint16_t crc16_update(uint16_t crc, uint8_t data)
+void ___boot(void) __attribute__ ((section (".BL")));
+void ___boot(void)
 {
-	return _crc16_update(crc, data);
+	asm volatile("nop\n");
+	asm volatile("nop\n");
+	asm volatile("nop\n");
+	asm volatile(".string \"Ala ma kota\"");
+	asm volatile("nop\n");
+	asm volatile("nop\n");
+	asm volatile("nop\n");
 }
 
 union PAGE_DATA {
 	struct {
 		uint16_t address; // address of received page
 		uint8_t payload[SPM_PAGESIZE]; // contente of the page
-		uint16_t crc; // its checksum (data+address)
+		uint16_t checksum; // its checksum (data+address)
 	};
 	uint8_t data[sizeof(uint16_t) + SPM_PAGESIZE + sizeof(uint16_t)];
 } page = {};
 
+		#define MAX_PAYLOAD_SIZE	(128+4)
+
+struct RX {
+	uint8_t data[MAX_PAYLOAD_SIZE];
+	uint8_t *ptr, *endptr;
+} rx;
+
 
 uint8_t receive_page(void)
 {
-	uint16_t crc = 0xffff;
+	uint16_t checksum = 0;
 	uint8_t *pdata = (uint8_t *)&page;
 
 	int cnt = sizeof(uint16_t) + SPM_PAGESIZE + sizeof(uint16_t);
 	for (; cnt > 0; cnt--)
 	{
-		uint8_t high = uartReceive();
-		uint8_t low = uartReceive();
-
-		if (high < '@' || high > 'P')
-			return 0x01; // error - format 
-		if (low < '@' || low > 'P')
-			return 0x02; // error - format
-
-		uint8_t b = (uint8_t)(high - '@') << 4 | (uint8_t)(low - '@');
-		*pdata++ = b;
+		uint8_t data = uartReceive();
+		*pdata++ = data;
 
 		if (cnt > sizeof(uint16_t))
-		{
-			crc = crc16_update(crc, high);
-			crc = crc16_update(crc, low);
-		}
+			checksum -= data;
 	}
 
-	// check CRC 16
-	if (crc != page.crc)
+	// check CRC
+	if (checksum != page.checksum)
 		return 0x03; // error - CRC
 
 	return 0x00;
@@ -96,12 +99,12 @@ int main(void)
 
 	RS485_DIR_RECEIVE;
 	uint16_t wait_counter = 0;
-	//txt("Start\r\n");
+	txt("Start\r\n");
 	while(1) {
 
 		// wait for advert
 		int adv = uartReceiveNoBlock();
-		if (adv == 'A' ) // advert received
+		if (adv == 'A' ) // advert received - activate bootloader mode!!
 		{
 			//txt("Bootloader mode\r\n");
 			break;
@@ -114,44 +117,108 @@ int main(void)
 		}
 	}
 
+	#define BL_COMMAND_ACTIVATE	'A'
+	#define BL_COMMAND_DEACTIVATE 'B'
+	#define BL_COMMAND_PING '?'
+	#define BL_COMMAND_REBOOT 'R'
+
+	#define BL_COMMAND_READ_PAGE 'X'
+	#define BL_COMMAND_WRITE_PAGE 'W'
 	
+	// 00 - uint8_t: address
+	// 01 - uint8_t: command
+	bool activated = false;
 	while(1)
 	{
-		uint8_t cmd = uartReceive();
+		// receive address
+		uint8_t addr = uartReceive();
+		if (addr != BOOTLOADER_HARDWARE_ADDRESS) 
+			continue; // its not for me
 
-		if (cmd == 'C') // got challenge, send response
+		// receive command
+		uint8_t command = uartReceive();
+
+		// receive payload length
+		uint8_t payload_size = uartReceive();
+
+		if (payload_size > MAX_PAYLOAD_SIZE)
+			continue; // something is wrong
+
+		uint16_t checksum = (uint16_t)addr + (uint16_t)command + (uint16_t)payload_size;
+
+		// receive data
+		rx.ptr = rx.data;
+		rx.endptr = rx.data + payload_size;
+		while (rx.endptr != rx.ptr) {
+			uint8_t data = uartReceive();
+			*rx.ptr++ = data;
+			checksum += (uint16_t)data;
+		}
+
+		// apply checksum
+		checksum -= (uint16_t)uartReceive() << 8;
+		checksum -= uartReceive();
+
+		if (checksum != 0)
+			continue; // error in message
+			/*
+		if (!activated)
 		{
-			_delay_ms((int)BOOTLOADER_HARDWARE_ADDRESS << 3); // wait some time
+			if (command != BL_COMMAND_ACTIVATE) // command: activate
+				continue;
+			if (uartReceive() != ~BOOTLOADER_HARDWARE_ADDRESS) // magic 1
+				continue;
+			if (uartReceive() != (BOOTLOADER_HARDWARE_ADDRESS & 0x0F >> 4 | BOOTLOADER_HARDWARE_ADDRESS & 0xF0 << 4)) // magic 2
+				continue;
+			if (uartReceive() != ~(BOOTLOADER_HARDWARE_ADDRESS & 0x0F >> 4 | BOOTLOADER_HARDWARE_ADDRESS & 0xF0 << 4)) // magic 3
+				continue;
+			if (uartReceive() != 84) // magic 4
+				continue;
+			if (uartReceive() != 74) // magic 5
+				continue;
+
+			// ok, bootloader activated
+			activated = true;
+		}
+
+		if (command == BL_COMMAND_DEACTIVATE) // deactivate bootloader
+		{
+			activated = false;
+		}
+*/
+		if (command == BL_COMMAND_PING) // got challenge, send response -- identify itself
+		{
 			RS485_DIR_SEND;
-			uartSend('c');
 			uartSend(BOOTLOADER_HARDWARE_ADDRESS);
+			uartSend(BL_COMMAND_PING);
 			RS485_DIR_RECEIVE;
 		}
 
-		if (cmd == 'R') // restart whole device
+		if (command == BL_COMMAND_REBOOT) // restart whole device
 			bootRestart();
 
-		if (cmd == 'P') { // receive a page
-			uint8_t addr = uartReceive();
-			uint8_t res = receive_page();
-
-			//if (addr != )
+		if (command == BL_COMMAND_READ_PAGE) // 
+		{
+			memcpy_P(rx.data, *(uint8_t**)rx.data, SPM_PAGESIZE);
 			RS485_DIR_SEND;
-			uartSend('p');
-			uartSend(0xF0 | res);
+			uartSend(BOOTLOADER_HARDWARE_ADDRESS);
+			uartSend(BL_COMMAND_READ_PAGE);
+			for (rx.ptr = rx.data, rx.endptr = rx.data + SPM_PAGESIZE; rx.endptr != rx.ptr; rx.ptr++)
+				uartSend(*rx.ptr);
 			RS485_DIR_RECEIVE;
 		}
+
+		if (command == BL_COMMAND_WRITE_PAGE)
+		{
+			bootStorePage(*(uint32_t*)rx.data, rx.data + sizeof(uint32_t));
+			RS485_DIR_SEND;
+			uartSend(BOOTLOADER_HARDWARE_ADDRESS);
+			uartSend(BL_COMMAND_WRITE_PAGE);
+			RS485_DIR_RECEIVE;
+		}
+
 	}
 
-
-/*
-	uint32_t page = 0;
-	receive_page();
-
-	bootRestart();
-	*/
-	while(1)
-		asm("nop");
 	
 }
 
