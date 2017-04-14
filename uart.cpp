@@ -28,12 +28,9 @@
  void uartInitialize(void)
  {
 	 // init RX485 line driver interface
-	 DDRD = 0b00000110; // 0:RX, 1:TX, 3:DIR
+	DDRD = 0b00000110; // 0:RX, 1:TX, 3:DIR
+	DDRB |= _BV(PORTB5) | _BV(PORTB2) | _BV(PORTB1);
 
-	DDRB |= _BV(PORTB2);
-	DDRB |= _BV(PORTB1);
-	DDRB |= _BV(PORTB5);
-	DDRD = 0b00000110; // 0:RX, 1:TX, 3:DIR			1-wyjscie (1 i 3) ddr - data direction
 
 
 	 // init serial port
