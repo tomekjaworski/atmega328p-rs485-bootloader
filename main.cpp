@@ -118,6 +118,8 @@ void send_response(uint8_t command, uint8_t addr, const uint8_t* buffer, uint8_t
 	RS485_DIR_RECEIVE;
 }
 
+static_assert(sizeof(const void *) == sizeof(uint16_t), "Pointer type different then 2; update the protocol!");
+
 int main(void)
 {
 	uartInitialize();
@@ -206,7 +208,7 @@ int main(void)
 		}
 
 		if (command == BL_COMMAND_WRITE_PAGE) {
-			bootStorePage(*(uint32_t*)rx.data, rx.data + sizeof(uint32_t));
+			bootStorePage(*(uint32_t*)rx.data, rx.data + sizeof(uint16_t));
 			send_response(BL_COMMAND_WRITE_PAGE, addr, NULL, 0);
 		}
 
