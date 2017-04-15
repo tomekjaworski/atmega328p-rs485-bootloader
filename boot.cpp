@@ -21,25 +21,27 @@
  
  void bootStorePage(uint32_t page, const uint8_t* buf)
  {
-	 boot_page_erase(page);
-	 boot_spm_busy_wait();
+	boot_page_erase(page);
+	boot_spm_busy_wait();
 
-	 for (int i = 0; i < SPM_PAGESIZE; i+=2)
-	 {
-		 uint16_t w = *buf++;
-		 w |= (*buf++) << 8;
-		 boot_page_fill(page + i, w);
-	 }
-	 boot_page_write(page);
-	 boot_spm_busy_wait();
+	for (int i = 0; i < SPM_PAGESIZE; i+=2)
+	{
+		uint16_t w = *buf++;
+		w |= (*buf++) << 8;
+		boot_page_fill(page + i, w);
+	}
+	boot_page_write(page);
+	boot_spm_busy_wait();
+
+	boot_rww_enable();
  }
 
  void bootRestart(void)
- {
-	 // allow new code to be executed
-	 boot_rww_enable();
+{
+	// allow new code to be executed
+	boot_rww_enable();
 
-	 // start watchdog and lock so we can reboot
-	 wdt_enable(WDTO_15MS);
-	 while(1);
- }
+	// start watchdog and lock so we can reboot
+	wdt_enable(WDTO_15MS);
+	while(1);
+}
