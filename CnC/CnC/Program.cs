@@ -178,7 +178,7 @@ namespace CnC
             int anim_counter = 0;
 
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.Write("\nSending CnC Advertisemen to {0} serial ports: ", ports.Count);
+            Console.Write("\nSending C&C Advertisement to {0} serial ports: ", ports.Count);
             Console.ForegroundColor = ConsoleColor.Gray;
 
             Console.CursorVisible = false;
@@ -206,7 +206,7 @@ namespace CnC
             foreach (String port_name in SerialPort.GetPortNames()) {
                 try {
                     SerialPort sp = new SerialPort(port_name, 19200, Parity.Even, 8, StopBits.One);
-                    Console.Write("Openning {0}... ", sp.PortName);
+                    Console.Write("Opening {0}... ", sp.PortName);
                     sp.ReadTimeout = 200;
                     sp.Open();
                     Console.WriteLine("Ok");
