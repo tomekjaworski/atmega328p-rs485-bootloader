@@ -108,7 +108,7 @@ namespace CnC
 
         #region Read routines
 
-        byte ReadByte(UInt32 address)
+        public byte ReadByte(UInt32 address)
         {
             if (address >= this.mem.Length)
                 throw new MemoryMapException("Address out of bounds");
@@ -116,7 +116,7 @@ namespace CnC
             return this.mem[address];
         }
 
-        Int16 ReadInt16(UInt32 address)
+        public Int16 ReadInt16(UInt32 address)
         {
             uint b0 = ReadByte(address);
             uint b1 = ReadByte(address + 1);
@@ -130,7 +130,7 @@ namespace CnC
             return value;
         }
 
-        UInt16 ReadUInt16(UInt32 address)
+        public UInt16 ReadUInt16(UInt32 address)
         {
             uint b0 = ReadByte(address);
             uint b1 = ReadByte(address + 1);
@@ -144,7 +144,7 @@ namespace CnC
             return value;
         }
 
-        Int32 ReadInt32(UInt32 address)
+        public Int32 ReadInt32(UInt32 address)
         {
             uint b0 = ReadByte(address);
             uint b1 = ReadByte(address + 1);
@@ -160,7 +160,7 @@ namespace CnC
             return value;
         }
 
-        UInt16 ReadUInt32(UInt32 address)
+        public UInt16 ReadUInt32(UInt32 address)
         {
             uint b0 = ReadByte(address);
             uint b1 = ReadByte(address + 1);
@@ -175,6 +175,13 @@ namespace CnC
 
             return value;
         }
+
+        public void Read(uint addr, byte[] data, int offset, int count)
+        {
+            for (int i = 0; i < count; i++)
+                data[offset + i] = this.ReadByte(addr++);
+        }
+
         #endregion
 
         public void Dump(string filename)
@@ -218,5 +225,7 @@ namespace CnC
             }
             //
         }
+
+ 
     }
 }
