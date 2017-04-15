@@ -118,45 +118,71 @@ namespace CnC
             Console.CursorVisible = true;
             */
 
-            mm.Dump("pobrane.txt");
-        private static void ReadEEPROM(Endpoint endpoint, MemoryMap mm)
+           // mm.Dump("pobrane.txt");
+        }
+
+        private static void ReadEEPROM(Endpoint endpoint, MemoryMap dest)
         {
             Console.CursorVisible = false;
 
-            Console.Write("Reading EEPROM memory ({0}kB): ", mm.Size / 1024);
-            ConsoleProgressBar cpb = new ConsoleProgressBar(0, mm.Size);
+            Console.Write("Reading EEPROM memory ({0}kB):   ", dest.Size / 1024);
+            ConsoleProgressBar cpb = new ConsoleProgressBar(0, dest.Size);
 
             for (uint addr = 0; addr < 1 * 1024; addr += 128, cpb.Progress = addr) {
                 Message msg_readpage = new Message((byte)endpoint.address, MessageType.ReadEepromPage, new byte[] { (byte)(addr & 0xFF), (byte)(addr >> 8), });
 
                 Message response = SendAndWaitForResponse(endpoint, msg_readpage, 2000);
-                mm.Write(addr, response.Payload, 0, 128);
+                dest.Write(addr, response.Payload, 0, 128);
             }
 
             Console.CursorVisible = true;
             Console.WriteLine("Done.");
         }
 
-        private static void WriteEEPROM(Endpoint endpoint, MemoryMap mm)
+        private static bool VerifyEEPROM(Endpoint endpoint, MemoryMap source)
         {
             Console.CursorVisible = false;
 
-            Console.Write("Writing EEPROM memory ({0}kB): ", mm.Size / 1024);
-            ConsoleProgressBar cpb = new ConsoleProgressBar(0, mm.Size);
+            Console.Write("Verifying EEPROM memory ({0}kB): ", source.Size / 1024);
+            ConsoleProgressBar cpb = new ConsoleProgressBar(0, source.Size);
+            MemoryMap mmread = new MemoryMap(source.Size);
+
+            for (uint addr = 0; addr < 1 * 1024; addr += 128, cpb.Progress = addr) {
+                Message msg_readpage = new Message((byte)endpoint.address, MessageType.ReadEepromPage, new byte[] { (byte)(addr & 0xFF), (byte)(addr >> 8), });
+
+                Message response = SendAndWaitForResponse(endpoint, msg_readpage, 2000);
+                mmread.Write(addr, response.Payload, 0, 128);
+            }
+
+            bool result = source.BinaryCompare(mmread);
+
+            Console.CursorVisible = true;
+            if (result)
+                Console.WriteLine("Correct.");
+            else
+                Console.WriteLine("Failed.");
+
+            return result;
+        }
+
+        private static void WriteEEPROM(Endpoint endpoint, MemoryMap source)
+        {
+            Console.CursorVisible = false;
+
+            Console.Write("Writing EEPROM memory ({0}kB):   ", source.Size / 1024);
+            ConsoleProgressBar cpb = new ConsoleProgressBar(0, source.Size);
 
             for (uint addr = 0; addr < 1 * 1024; addr += 128, cpb.Progress = addr) {
 
                 byte[] payload = new byte[2 + 128];
                 payload[0] = (byte)(addr & 0xFF);
                 payload[1] = (byte)((addr >> 8) & 0xFF);
-                mm.Read(addr, payload, 2, 128);
+                source.Read(addr, payload, 2, 128);
 
                 Message msg_write = new Message((byte)endpoint.address, MessageType.WriteEepromPage, payload);
 
                 Message response = SendAndWaitForResponse(endpoint, msg_write, 2000);
             }
-
-
 
             Console.CursorVisible = true;
             Console.WriteLine("Done.");
@@ -169,32 +195,44 @@ namespace CnC
             MessageExtractor me = new MessageExtractor();
             byte[] buffer = new byte[1024];
 
-            // setup serial port
-            ep.sp.DiscardInBuffer();
-            ep.sp.DiscardOutBuffer();
-            ep.sp.ReadTimeout = 20;
-
-            // send data
-            ep.sp.Write(request.Binary, 0, request.BinarySize);
-
-            // and wait for response
-            DateTime start = DateTime.Now;
+            int retries = 3;
             Message msg = null;
-            do {
-                int read = -1;
-                try {
-                    read = ep.sp.Read(buffer, 0, buffer.Length);
-                }
-                catch (TimeoutException tex) {
-                    continue; // ignore timeouts
-                }
 
-                me.AddData(buffer, read);
-                if (me.TryExtract(ref msg, request.Address, request.Type))
-                    break; // ok, got message!
+            while (retries-- > 0) {
 
-            } while ((DateTime.Now - start).TotalMilliseconds <= timeout && timeout != -1);
+                // setup serial port
+                ep.sp.DiscardInBuffer();
+                ep.sp.DiscardOutBuffer();
+                ep.sp.ReadTimeout = 20;
 
+                // send data
+                ep.sp.Write(request.Binary, 0, request.BinarySize);
+                Debug.WriteLine("sent " + request.BinarySize.ToString());
+
+                // and wait for response
+                DateTime start = DateTime.Now;
+                do {
+                    int read = -1;
+                    try {
+                        read = ep.sp.Read(buffer, 0, buffer.Length);
+                    }
+                    catch (TimeoutException tex) {
+                        Debug.WriteLine("TO");
+                        continue; // ignore timeouts
+                    }
+
+                    Debug.WriteLine("R " + read.ToString());
+                    me.AddData(buffer, read);
+                    if (me.TryExtract(ref msg, request.Address, request.Type))
+                        break; // ok, got message!
+
+                } while ((DateTime.Now - start).TotalMilliseconds <= timeout && timeout != -1);
+
+                // if message was correctly received then stop communication
+                if (msg != null)
+                    break;
+                Debug.WriteLine("RETRY");
+            }
             if (msg == null && throw_timeout_exception)
                 throw new TimeoutException(string.Format("No response from bootloader device 0x{0:X2} on {1}", ep.address, ep.sp.PortName));
 

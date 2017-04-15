@@ -226,6 +226,16 @@ namespace CnC
             //
         }
 
- 
+        public bool BinaryCompare(MemoryMap mmread)
+        {
+            if (mmread.Size != this.Size)
+                return false; // size don't match
+
+            for (int i = 0; i < this.Size; i++)
+                if (mmread.mem[i] != this.mem[i])
+                    return false;
+
+            return true;
+        }
     }
 }

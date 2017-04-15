@@ -181,7 +181,7 @@ int main(void)
 		}
 
 		if (msg_type == MessageType::WriteFlashPage) {
-			bootStorePage(*(uint32_t*)rx.data, rx.data + sizeof(uint16_t));
+			bootStorePage(*(uint16_t*)rx.data, rx.data + sizeof(uint16_t));
 			send_response(msg_type, addr, NULL, 0);
 		}
 		
