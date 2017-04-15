@@ -119,8 +119,48 @@ namespace CnC
             */
 
             mm.Dump("pobrane.txt");
+        private static void ReadEEPROM(Endpoint endpoint, MemoryMap mm)
+        {
+            Console.CursorVisible = false;
+
+            Console.Write("Reading EEPROM memory ({0}kB): ", mm.Size / 1024);
+            ConsoleProgressBar cpb = new ConsoleProgressBar(0, mm.Size);
+
+            for (uint addr = 0; addr < 1 * 1024; addr += 128, cpb.Progress = addr) {
+                Message msg_readpage = new Message((byte)endpoint.address, MessageType.ReadEepromPage, new byte[] { (byte)(addr & 0xFF), (byte)(addr >> 8), });
+
+                Message response = SendAndWaitForResponse(endpoint, msg_readpage, 2000);
+                mm.Write(addr, response.Payload, 0, 128);
+            }
+
+            Console.CursorVisible = true;
+            Console.WriteLine("Done.");
         }
 
+        private static void WriteEEPROM(Endpoint endpoint, MemoryMap mm)
+        {
+            Console.CursorVisible = false;
+
+            Console.Write("Writing EEPROM memory ({0}kB): ", mm.Size / 1024);
+            ConsoleProgressBar cpb = new ConsoleProgressBar(0, mm.Size);
+
+            for (uint addr = 0; addr < 1 * 1024; addr += 128, cpb.Progress = addr) {
+
+                byte[] payload = new byte[2 + 128];
+                payload[0] = (byte)(addr & 0xFF);
+                payload[1] = (byte)((addr >> 8) & 0xFF);
+                mm.Read(addr, payload, 2, 128);
+
+                Message msg_write = new Message((byte)endpoint.address, MessageType.WriteEepromPage, payload);
+
+                Message response = SendAndWaitForResponse(endpoint, msg_write, 2000);
+            }
+
+
+
+            Console.CursorVisible = true;
+            Console.WriteLine("Done.");
+        }
 
         static Message SendAndWaitForResponse(Endpoint ep, Message request, int timeout, bool throw_timeout_exception = true)
         {
