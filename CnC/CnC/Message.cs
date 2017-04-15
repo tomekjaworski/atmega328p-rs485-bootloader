@@ -121,6 +121,7 @@ namespace CnC
 
                 // ok, finally it seems that we have got a message! :)
                 msg = new Message(data[0], (MessageType)data[1], data, 3, data[2]);
+                rxqueue.DeleteFirstBytes(3 + hdr[2] + 2);
                 return true;
             }
         }

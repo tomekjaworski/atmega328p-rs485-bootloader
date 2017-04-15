@@ -8,12 +8,15 @@ namespace CnC
 {
     public enum MessageType : byte
     {
-        BL_COMMAND_ACTIVATE = (byte)'A',
-        BL_COMMAND_DEACTIVATE = (byte)'B',
-        BL_COMMAND_PING = (byte)'?',
-        BL_COMMAND_REBOOT = (byte)'R',
+        Activate = (byte)'A',
+        Deactivate = (byte)'B',
 
-        BL_COMMAND_READ_PAGE = (byte)'X',
-        BL_COMMAND_WRITE_PAGE = (byte)'W'
+        Ping = (byte)'?',
+        Reboot = (byte)'R',
+
+        ReadFlashPage = (byte)'X',
+        WriteFlashPage = (byte)'W',
+        ReadEepromPage = (byte)'E',
+        WriteEepromPage = (byte)'F'
     }
 }

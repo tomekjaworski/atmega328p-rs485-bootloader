@@ -4,11 +4,12 @@
  * Created: 3/28/2017 22:10:49
  * Author : Tomek
  */ 
-#include <stddef.h>
 #include <avr/io.h>
+#include <avr/pgmspace.h>
+#include <avr/eeprom.h>
 #include <util/crc16.h>
 #include <util/delay.h>
-#include <avr/pgmspace.h>
+#include <stddef.h>
 #include "boot.h"
 #include "uart.h"
 
@@ -40,49 +41,32 @@ void ___boot(void)
 	asm volatile("nop\n");
 	asm volatile("nop\n");
 	asm volatile(".string \"Ala ma kota\"");
+	asm volatile(".string \"Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis vitae ipsum eu augue varius porta sit amet sed tellus. Aliquam erat volutpat. Sed ornare blandit tortor quis congue. Pellentesque et augue ut magna efficitur condimentum. Quisque elementum leo sed justo molestie tempor. Interdum et malesuada fames ac ante ipsum primis in faucibus. Aenean commodo semper justo at laoreet. Etiam sodales nulla neque, id dictum orci scelerisque posuere.\"");
 	asm volatile("nop\n");
 	asm volatile("nop\n");
 	asm volatile("nop\n");
 }
 
-union PAGE_DATA {
-	struct {
-		uint16_t address; // address of received page
-		uint8_t payload[SPM_PAGESIZE]; // contente of the page
-		uint16_t checksum; // its checksum (data+address)
-	};
-	uint8_t data[sizeof(uint16_t) + SPM_PAGESIZE + sizeof(uint16_t)];
-} page = {};
+#define MAX_PAYLOAD_SIZE	(128+4)
 
-		#define MAX_PAYLOAD_SIZE	(128+4)
+enum class MessageType : uint8_t
+{
+	Activate = 'A',
+	Deactivate = 'B',
+
+	Ping = '?',
+	Reboot = 'R',
+
+	ReadFlashPage = 'X',
+	WriteFlashPage = 'W',
+	ReadEepromPage = 'E',
+	WriteEepromPage = 'F'
+};
 
 struct RX {
 	uint8_t data[MAX_PAYLOAD_SIZE];
 	uint8_t *ptr, *endptr;
 } rx;
-
-
-uint8_t receive_page(void)
-{
-	uint16_t checksum = 0;
-	uint8_t *pdata = (uint8_t *)&page;
-
-	int cnt = sizeof(uint16_t) + SPM_PAGESIZE + sizeof(uint16_t);
-	for (; cnt > 0; cnt--)
-	{
-		uint8_t data = uartReceive();
-		*pdata++ = data;
-
-		if (cnt > (int)sizeof(uint16_t))
-			checksum -= data;
-	}
-
-	// check CRC
-	if (checksum != page.checksum)
-		return 0x03; // error - CRC
-
-	return 0x00;
-}
 
 void txt(const char* ptr)
 {
@@ -92,15 +76,15 @@ void txt(const char* ptr)
 	RS485_DIR_RECEIVE;
 }
 
-void send_response(uint8_t command, uint8_t addr, const uint8_t* buffer, uint8_t count)
+void send_response(MessageType msg_type, uint8_t addr, const uint8_t* buffer, uint8_t count)
 {
-	uint16_t checksum = addr + command + count;
+	uint16_t checksum = addr + (uint16_t)msg_type + count;
 
 	RS485_DIR_SEND;
 
 	// send header
 	uartSend(addr); // protocol: address
-	uartSend(command); // protocol: command
+	uartSend((uint8_t)msg_type); // protocol: command
 	uartSend(count); // protocol: payload size
 
 	// send payload
@@ -119,6 +103,7 @@ void send_response(uint8_t command, uint8_t addr, const uint8_t* buffer, uint8_t
 }
 
 static_assert(sizeof(const void *) == sizeof(uint16_t), "Pointer type different then 2; update the protocol!");
+static_assert(sizeof(MessageType) == sizeof(uint8_t), "sizeof(MessageType) == sizeof(uint8_t)");
 
 int main(void)
 {
@@ -132,11 +117,8 @@ int main(void)
 
 		// wait for advert
 		int adv = uartReceiveNoBlock();
-		if (adv == 'A' ) // advert received - activate bootloader mode!!
-		{
-			//txt("Bootloader mode\r\n");
-			break;
-		}
+		if (adv == 'A' )
+			break; // advert received - enter bootloader mode!!
 
 		_delay_ms(1);
 		if (wait_counter++ > 2000) // wait 2 secs
@@ -145,13 +127,6 @@ int main(void)
 		}
 	}
 
-	#define BL_COMMAND_ACTIVATE	'A'
-	#define BL_COMMAND_DEACTIVATE 'B'
-	#define BL_COMMAND_PING '?'
-	#define BL_COMMAND_REBOOT 'R'
-
-	#define BL_COMMAND_READ_PAGE 'X'
-	#define BL_COMMAND_WRITE_PAGE 'W'
 	
 	// 00 - uint8_t: address
 	// 01 - uint8_t: command
@@ -160,11 +135,11 @@ int main(void)
 		// receive address
 		uint8_t addr = uartReceive();
 		//if (addr != BOOTLOADER_HARDWARE_ADDRESS)
-		if (addr != BOOTLOADER_HARDWARE_ADDRESS && addr != 0x40&& addr != 0x50&& addr != 0x52&& addr != 0xF0)
+		if (addr != BOOTLOADER_HARDWARE_ADDRESS /*&& addr != 0x40&& addr != 0x50&& addr != 0x52&& addr != 0xF0*/)
 			continue; // its not for me
 
 		// receive command
-		uint8_t command = uartReceive();
+		MessageType msg_type = (MessageType)uartReceive();
 
 		// receive payload length
 		uint8_t payload_size = uartReceive();
@@ -172,7 +147,7 @@ int main(void)
 		if (payload_size > MAX_PAYLOAD_SIZE)
 			continue; // something is wrong
 
-		uint16_t checksum = (uint16_t)addr + (uint16_t)command + (uint16_t)payload_size;
+		uint16_t checksum = (uint16_t)addr + (uint16_t)msg_type + (uint16_t)payload_size;
 
 		// receive data
 		rx.ptr = rx.data;
@@ -187,29 +162,39 @@ int main(void)
 		checksum -= (uint16_t)uartReceive() << 8;
 		checksum -= uartReceive();
 
-		//txt("chk");
-
 		if (checksum != 0)
 			continue; // error in message
 
-		if (command == BL_COMMAND_PING) // got challenge, send response -- identify itself
+		if (msg_type == MessageType::Ping) // got challenge, send response -- identify itself
 		{
-			send_response(BL_COMMAND_PING, addr, NULL, 0);
+			send_response(msg_type, addr, NULL, 0);
 		}
 
-		if (command == BL_COMMAND_REBOOT) { // restart whole device
-			send_response(BL_COMMAND_REBOOT, addr, NULL, 0);
+		if (msg_type == MessageType::Reboot) { // restart whole device
+			send_response(msg_type, addr, NULL, 0);
 			bootRestart();
 		}
 
-		if (command == BL_COMMAND_READ_PAGE) {
+		if (msg_type == MessageType::ReadFlashPage) {
 			memcpy_P(rx.data, *(uint8_t**)rx.data, SPM_PAGESIZE);
-			send_response(BL_COMMAND_READ_PAGE, addr, rx.data, SPM_PAGESIZE);
+			send_response(msg_type, addr, rx.data, SPM_PAGESIZE);
 		}
 
-		if (command == BL_COMMAND_WRITE_PAGE) {
+		if (msg_type == MessageType::WriteFlashPage) {
 			bootStorePage(*(uint32_t*)rx.data, rx.data + sizeof(uint16_t));
-			send_response(BL_COMMAND_WRITE_PAGE, addr, NULL, 0);
+			send_response(msg_type, addr, NULL, 0);
+		}
+		
+		if (msg_type == MessageType::ReadEepromPage) {
+			eeprom_read_block(rx.data, *(uint8_t**)rx.data, SPM_PAGESIZE);
+			eeprom_busy_wait();
+			send_response(msg_type, addr, rx.data, SPM_PAGESIZE);
+		}
+
+		if (msg_type == MessageType::WriteEepromPage) {
+			eeprom_write_block(*(uint8_t**)rx.data, rx.data, SPM_PAGESIZE);
+			eeprom_busy_wait();
+			send_response(msg_type, addr, rx.data, SPM_PAGESIZE);
 		}
 
 	}

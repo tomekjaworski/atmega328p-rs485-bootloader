@@ -52,49 +52,123 @@ namespace CnC
             // purge buffers
             PurgeSerialPorts(ports);
 
-            // get list of devices for each serial port
             List<Endpoint> endpoints = new List<Endpoint>();
+
+            
+            // get list of devices for each serial port
             foreach (SerialPort sp in ports)
                 AcquireDevicesOnSerialPort(endpoints, sp);
 
-
-            /*
-
-
-
-            // show geathered devices
+            // show discovered devices
             ShowDevices(endpoints.ToArray());
-            PurgeSerialPorts(ports);
+
+            return;
+            /*
+            uint addr = 0;
+            byte[] page = new byte[128];
+            byte[] payload = new byte[2 + page.Length];
+
+            page[0] = (byte)'T';
+            page[1] = (byte)'o';
+            page[2] = (byte)'m';
+            page[3] = (byte)'e';
+            page[4] = (byte)'k';
 
 
-            Message msg_ping = new Message(0x51, MessageType.BL_COMMAND_PING);
-            byte[] msg_ping_binary = msg_ping.ToBinary();
-            ports[0].Write(msg_ping_binary, 0, msg_ping_binary.Length);
-
+            payload[0] = (byte)(addr & 0xFF);
+            payload[1] = (byte)((addr >> 8) & 0xFF);
+            Array.Copy(page, 0, payload, 2, page.Length);
 
             SerialPort sp = ports[0];
-            byte[] rx = new byte[1024];
-            FifoBuffer rxqueue = new FifoBuffer(1024);
-            while(true) {
-                int read = sp.Read(rx, 0, rx.Length);
-                rxqueue.Write(rx, 0, read);
+            MessageExtractor me = new MessageExtractor();
+
+            sp.DiscardInBuffer();
+            sp.DiscardOutBuffer();
+            me.Discard();
+            Message msg_writepage = new Message(0x51, MessageType.WriteFlashPage, payload);
+            //sp.Write(msg_writepage.Binary, 0, msg_writepage.BinarySize);
+
+
+            Thread.Sleep(1000);
+            //return;
+            
+            Console.CursorVisible = false;
+
+            endpoints.Add(new Endpoint(ports[0], 0x51));
+
+            sp = ports[0];
+            me = new MessageExtractor();
+
+            sp.DiscardInBuffer();
+            sp.DiscardOutBuffer();
+            me.Discard();
+        
+            mm = new MemoryMap(1 * 1024);
+
+            Console.Write("Reading FLASH memory ({0}kB): ", mm.Size / 1024);
+            ConsoleProgressBar cpb = new ConsoleProgressBar(0, mm.Size);
+
+            for (addr = 0; addr < 1 * 1024; addr += 128, cpb.Progress=addr) {
+                Message msg_readpage = new Message(0x51, MessageType.ReadEepromPage, new byte[] { (byte)(addr & 0xFF), (byte)(addr >> 8), });
+
+                Message response = SendAndWaitForResponse(endpoints[0], msg_readpage, 2000);
+                mm.Write(addr, response.Payload, 0, 128);
             }
 
-            /*
-            for (Endpoint ep in endpoints) {
-                
-            }*/
+            Console.CursorVisible = true;
+            */
 
-
+            mm.Dump("pobrane.txt");
         }
+
+
+        static Message SendAndWaitForResponse(Endpoint ep, Message request, int timeout, bool throw_timeout_exception = true)
+        {
+            Debug.Assert(ep.address == request.Address);
+
+            MessageExtractor me = new MessageExtractor();
+            byte[] buffer = new byte[1024];
+
+            // setup serial port
+            ep.sp.DiscardInBuffer();
+            ep.sp.DiscardOutBuffer();
+            ep.sp.ReadTimeout = 20;
+
+            // send data
+            ep.sp.Write(request.Binary, 0, request.BinarySize);
+
+            // and wait for response
+            DateTime start = DateTime.Now;
+            Message msg = null;
+            do {
+                int read = -1;
+                try {
+                    read = ep.sp.Read(buffer, 0, buffer.Length);
+                }
+                catch (TimeoutException tex) {
+                    continue; // ignore timeouts
+                }
+
+                me.AddData(buffer, read);
+                if (me.TryExtract(ref msg, request.Address, request.Type))
+                    break; // ok, got message!
+
+            } while ((DateTime.Now - start).TotalMilliseconds <= timeout && timeout != -1);
+
+            if (msg == null && throw_timeout_exception)
+                throw new TimeoutException(string.Format("No response from bootloader device 0x{0:X2} on {1}", ep.address, ep.sp.PortName));
+
+            return msg;
+        }
+
 
         private static void ShowDevices(Endpoint[] endpoints)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("\nListing {0} acquired device(s): ", endpoints.Length);
+            Console.WriteLine("\nListing {0} discovered device(s): ", endpoints.Length);
             Console.ForegroundColor = ConsoleColor.Gray;
 
-            foreach(Endpoint ep in endpoints) {
+            foreach (Endpoint ep in endpoints) {
                 Console.WriteLine("   Device 0x{0:X2} on {1}", ep.address, ep.sp.PortName);
             }
         }
@@ -105,7 +179,7 @@ namespace CnC
             Console.CursorVisible = false;
 
             bool intro = true;
-            int cx=0, cy=0;
+            int cx = 0, cy = 0;
 
             int timeout = 200;
 
@@ -114,7 +188,7 @@ namespace CnC
             MessageExtractor me = new MessageExtractor();
 
             // scan through 0x00 - 0xEF. Range 0xF0 - 0xFF is reserved
-            for (int i = 0x00; i < 0xF0; i++) { 
+            for (int i = 0x00; i < 0xF0; i++) {
 
                 if (intro) {
                     Console.Write("Looking for device ");
@@ -134,28 +208,14 @@ namespace CnC
                 sp.DiscardOutBuffer();
                 me.Discard();
 
-                Message ping_message = new Message((byte)i, MessageType.BL_COMMAND_PING);
-                sp.Write(ping_message.Binary, 0, ping_message.BinarySize);
+                Message ping_message = new Message((byte)i, MessageType.Ping);
+                Message msg = SendAndWaitForResponse(new Endpoint(sp, i), ping_message, 200, false);
 
-                DateTime start = DateTime.Now;
-                do {
-                    int read = -1;
-                    try {
-                        read = sp.Read(buffer, 0, buffer.Length);
-                    } catch(TimeoutException tex) {
-                        continue; // ignore timeouts
-                    }
-
-                    me.AddData(buffer, read);
-                    Message msg = null;
-                    if (!me.TryExtract(ref msg, i, MessageType.BL_COMMAND_PING))
-                        continue; // failed
-
+                if (msg != null) {
                     Console.WriteLine(" Found!");
                     intro = true;
-
-                } while ((DateTime.Now - start).TotalMilliseconds <= timeout);
-
+                    endpoints.Add(new Endpoint(sp, i));
+                }
             }
 
             Console.CursorVisible = true;
@@ -220,6 +280,60 @@ namespace CnC
             }
 
             return ports;
+        }
+    }
+
+
+    public class ConsoleProgressBar
+    {
+        private int cx, cy;
+        private int width;
+        private string content;
+        private double min, max, progress;
+
+        public double Progress
+        {
+            get { return this.progress; }
+            set {
+                this.progress = value;
+                UpdateContent();
+                Show();
+            }
+        }
+          
+
+        public ConsoleProgressBar(double min, double max,double start_value = 0, int width = 30)
+        { 
+            this.progress = start_value;
+            this.cx = Console.CursorLeft;
+            this.cy = Console.CursorTop;
+            this.width = width;
+            this.min = min;
+            this.max = max;
+
+            this.UpdateContent();
+
+            Show();
+        }
+
+        private void UpdateContent()
+        {
+            this.content = "[";
+
+            double p = (progress - min) / (max - min);
+            int pw = (int)Math.Round((double)width * p);
+
+            for (int i = 0; i < pw; i++) this.content += '#';
+            for (int i = 0; i < width - pw; i++) this.content += '.';
+
+            this.content += "] ";
+            this.content += (p * 100.0).ToString("N2") + "%";
+        }
+
+        void Show()
+        {
+            Console.SetCursorPosition(cx, cy);
+            Console.Write(this.content);
         }
     }
 }

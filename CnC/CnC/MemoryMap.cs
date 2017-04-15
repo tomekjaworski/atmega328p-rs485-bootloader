@@ -187,7 +187,7 @@ namespace CnC
             using (StreamWriter sw = new StreamWriter(fs, Encoding.ASCII)) {
 
                 while (bytes_left > 0) {
-                 //   sw.Write("{0:X8} ", address);
+                    sw.Write("{0:X8} ", address);
 
                     int to_read = Math.Min(bytes_per_row, bytes_left);
 
