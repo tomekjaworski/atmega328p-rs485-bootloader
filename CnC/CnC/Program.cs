@@ -1,6 +1,7 @@
 ﻿using IntelHEX;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.IO.Ports;
 using System.Linq;
@@ -45,7 +46,7 @@ namespace CnC
 
             List<SerialPort> ports = ListAndOpenSerialPorts();
 
-            // send advertisement to all devices
+            // send advertisement to all devices, co they can stay in bootloader mode
             SendAdvertisement(ports);
 
             // purge buffers
@@ -56,9 +57,33 @@ namespace CnC
             foreach (SerialPort sp in ports)
                 AcquireDevicesOnSerialPort(endpoints, sp);
 
+
+            /*
+
+
+
             // show geathered devices
             ShowDevices(endpoints.ToArray());
+            PurgeSerialPorts(ports);
 
+
+            Message msg_ping = new Message(0x51, MessageType.BL_COMMAND_PING);
+            byte[] msg_ping_binary = msg_ping.ToBinary();
+            ports[0].Write(msg_ping_binary, 0, msg_ping_binary.Length);
+
+
+            SerialPort sp = ports[0];
+            byte[] rx = new byte[1024];
+            FifoBuffer rxqueue = new FifoBuffer(1024);
+            while(true) {
+                int read = sp.Read(rx, 0, rx.Length);
+                rxqueue.Write(rx, 0, read);
+            }
+
+            /*
+            for (Endpoint ep in endpoints) {
+                
+            }*/
 
 
         }
@@ -76,47 +101,64 @@ namespace CnC
 
         private static void AcquireDevicesOnSerialPort(List<Endpoint> endpoints, SerialPort sp)
         {
-            Console.WriteLine("Sending Challenge to serial port {0}... ", sp.PortName);
-            byte[] req = new byte[] { (byte)'C' };
-            sp.Write(req, 0, 1);
-            Console.WriteLine("Ok. ");
+            Console.WriteLine("Sending PING to serial port {0}... ", sp.PortName);
+            Console.CursorVisible = false;
 
-            // wait for them
-            Console.WriteLine("Waiting... ");
-            Thread.Sleep(200);
+            bool intro = true;
+            int cx=0, cy=0;
 
-            int dt = 50;
-            byte[] buffer = new byte[32];
+            int timeout = 200;
 
-            DateTime start = DateTime.Now;
-            MemoryStream ms = new MemoryStream();
-            while ((DateTime.Now - start).TotalMilliseconds <= 3000) {
-                try {
-                    int read = sp.Read(buffer, 0, buffer.Length);
-                    ms.Write(buffer, 0, read);
-                    Console.WriteLine("[{0} on {1}]", string.Join(",", buffer.Take(read).Select(x => "0x" + x.ToString("X2")).ToArray()), sp.PortName);
+            sp.ReadTimeout = 20;
+            byte[] buffer = new byte[1024];
+            MessageExtractor me = new MessageExtractor();
+
+            // scan through 0x00 - 0xEF. Range 0xF0 - 0xFF is reserved
+            for (int i = 0x00; i < 0xF0; i++) { 
+
+                if (intro) {
+                    Console.Write("Looking for device ");
+                    cx = Console.CursorLeft;
+                    cy = Console.CursorTop;
+                    intro = false;
                 }
-                catch (TimeoutException tex) {
-                    //
-                }
-                Thread.Sleep(dt);
+
+                Console.SetCursorPosition(cx, cy);
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.Write("0x{0:X2}", i);
+                Console.ForegroundColor = ConsoleColor.Gray;
+
+
+                // send ping do selected device
+                sp.DiscardInBuffer();
+                sp.DiscardOutBuffer();
+                me.Discard();
+
+                Message ping_message = new Message((byte)i, MessageType.BL_COMMAND_PING);
+                sp.Write(ping_message.Binary, 0, ping_message.BinarySize);
+
+                DateTime start = DateTime.Now;
+                do {
+                    int read = -1;
+                    try {
+                        read = sp.Read(buffer, 0, buffer.Length);
+                    } catch(TimeoutException tex) {
+                        continue; // ignore timeouts
+                    }
+
+                    me.AddData(buffer, read);
+                    Message msg = null;
+                    if (!me.TryExtract(ref msg, i, MessageType.BL_COMMAND_PING))
+                        continue; // failed
+
+                    Console.WriteLine(" Found!");
+                    intro = true;
+
+                } while ((DateTime.Now - start).TotalMilliseconds <= timeout);
+
             }
 
-
-            // parse the acquired stream
-            ms.Seek(0, SeekOrigin.Begin);
-            BinaryReader br = new BinaryReader(ms);
-            while (br.PeekChar() != -1) {
-                int code = br.Read();
-                if (code != 'c') // challenge response
-                    continue;
-
-                int addr = br.Read(); // bootloader address
-                if (addr == -1)
-                    continue;
-
-                endpoints.Add(new Endpoint(sp, addr));
-            }
+            Console.CursorVisible = true;
         }
 
         private static void PurgeSerialPorts(List<SerialPort> ports)
@@ -132,20 +174,28 @@ namespace CnC
         {
             byte[] req;
             Console.WriteLine("*** TURN ON all devices and press any key to processed...");
+            char[] anim = { '/', '-', '\\', '|' };
+            int anim_counter = 0;
 
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.Write("\nSending CnC Advertisemen to {0} serial ports: ", ports.Count);
             Console.ForegroundColor = ConsoleColor.Gray;
+
+            Console.CursorVisible = false;
+            int cx = Console.CursorLeft;
+
             while (!Console.KeyAvailable) {
                 req = new byte[] { (byte)'A' };
                 foreach (SerialPort sp in ports)
                     sp.Write(req, 0, 1);
-                Thread.Sleep(100);
-                Console.Write('.');
 
+                Thread.Sleep(100);
+                Console.CursorLeft = cx;
+                Console.Write(anim[anim_counter++ % 4]);
             }
 
             Console.WriteLine(" Done.");
+            Console.CursorVisible = true;
         }
 
         private static List<SerialPort> ListAndOpenSerialPorts()

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -20,20 +21,25 @@ namespace CnC
         public int BinarySize => 1 + 1 + 1 + this.payload.Length + 2;
 
         public Message(byte address, MessageType type)
-            : this(address, type, new byte[0])
+            : this(address, type, new byte[0], 0, 0)
         { }
 
         public Message(byte address, MessageType type, byte[] payload)
+            : this(address, type, payload, 0, payload.Length)
+        { }
+
+
+        public Message(byte address, MessageType type, byte[] payload, int offset, int count)
         {
             if (payload == null)
                 throw new NullReferenceException("payload");
-            if (payload.Length > 200)
+            if (count > 200)
                 throw new ArgumentOutOfRangeException("payload");
 
             this.address = address;
             this.type = type;
-            this.payload = payload.Clone() as byte[];
-
+            this.payload = new byte[count];
+            Array.Copy(payload, offset, this.payload, 0, count);
         }
 
         private byte[] ToBinary()
@@ -53,6 +59,70 @@ namespace CnC
             msg[3 + payload.Length + 1] = (byte)(checksum & 0x00FF);
 
             return msg;
+        }
+
+    }
+
+    public class MessageExtractor
+    {
+        FifoBuffer rxqueue;
+
+        public MessageExtractor()
+        {
+            this.rxqueue = new FifoBuffer(1024);
+        }
+
+        public void Discard()
+        {
+            rxqueue.Discard();
+        }
+
+        public void AddData(byte[] data, int count)
+        {
+            rxqueue.Write(data, 0, count);
+            Debug.Assert(rxqueue.Count != 0);
+        }
+
+        public bool TryExtract(ref Message msg, int expected_address, MessageType expected_type)
+        {
+            while (true) {
+
+                if (rxqueue.Count < 5)
+                    return false;  // not enough data
+
+                // peek header
+                byte[] hdr = rxqueue.PeekBytes(0, 3);
+                if (hdr[0] != expected_address) {
+                    // address invalid
+                    rxqueue.ReadByte();
+                    continue;
+                }
+
+                if (hdr[1] != (byte)expected_type) {
+                    // command does not match
+                    rxqueue.ReadByte();
+                    continue;
+                }
+
+                if (rxqueue.Count < 3 + hdr[2] + 2)
+                    return false; // not enough data for further testing; wait for them
+
+                // check checksum
+                byte[] data = rxqueue.PeekBytes(0, 3 + hdr[2] + 2);
+                UInt16 checksum = 0;
+                for (int j = 0; j < data[2] + 3; j++)
+                    checksum += data[j];
+
+                if (data[data.Length - 2] != checksum >> 8 || data[data.Length - 1] != (checksum & 0x00FF)) {
+                    // checksum error
+                    rxqueue.ReadByte();
+                    continue;
+                }
+
+                // ok, finally it seems that we have got a message! :)
+                msg = new Message(data[0], (MessageType)data[1], data, 3, data[2]);
+                return true;
+            }
         }
 
 

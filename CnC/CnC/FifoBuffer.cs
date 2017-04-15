@@ -22,6 +22,7 @@ namespace CnC
 
 		public void Write(byte[] bytes, int offset, int count)
 		{
+            //TODO exception 
 			Array.Copy(bytes, offset, this.buffer, this.position, count);
 			this.position += count;
 		}
@@ -53,5 +54,20 @@ namespace CnC
 		{
 			return System.Net.IPAddress.NetworkToHostOrder(BitConverter.ToInt32(this.buffer, offset));
 		}
-	}
+
+        internal int ReadByte()
+        {
+            if (Count == 0)
+                return -1;
+
+            int b = this.buffer[0];
+            DeleteFirstBytes(1);
+            return b;
+        }
+
+        internal void Discard()
+        {
+            position = 0;
+        }
+    }
 }

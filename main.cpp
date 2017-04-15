@@ -92,14 +92,14 @@ void txt(const char* ptr)
 	RS485_DIR_RECEIVE;
 }
 
-void send_response(uint8_t command, const uint8_t* buffer, uint8_t count)
+void send_response(uint8_t command, uint8_t addr, const uint8_t* buffer, uint8_t count)
 {
-	uint16_t checksum = BOOTLOADER_HARDWARE_ADDRESS + command + count;
+	uint16_t checksum = addr + command + count;
 
 	RS485_DIR_SEND;
 
 	// send header
-	uartSend(BOOTLOADER_HARDWARE_ADDRESS); // protocol: address
+	uartSend(addr); // protocol: address
 	uartSend(command); // protocol: command
 	uartSend(count); // protocol: payload size
 
@@ -157,7 +157,8 @@ int main(void)
 	{
 		// receive address
 		uint8_t addr = uartReceive();
-		if (addr != BOOTLOADER_HARDWARE_ADDRESS) 
+		//if (addr != BOOTLOADER_HARDWARE_ADDRESS)
+		if (addr != BOOTLOADER_HARDWARE_ADDRESS && addr != 0x40&& addr != 0x50&& addr != 0x52&& addr != 0xF0)
 			continue; // its not for me
 
 		// receive command
@@ -188,49 +189,25 @@ int main(void)
 
 		if (checksum != 0)
 			continue; // error in message
-			/*
-		if (!activated)
-		{
-			if (command != BL_COMMAND_ACTIVATE) // command: activate
-				continue;
-			if (uartReceive() != ~BOOTLOADER_HARDWARE_ADDRESS) // magic 1
-				continue;
-			if (uartReceive() != (BOOTLOADER_HARDWARE_ADDRESS & 0x0F >> 4 | BOOTLOADER_HARDWARE_ADDRESS & 0xF0 << 4)) // magic 2
-				continue;
-			if (uartReceive() != ~(BOOTLOADER_HARDWARE_ADDRESS & 0x0F >> 4 | BOOTLOADER_HARDWARE_ADDRESS & 0xF0 << 4)) // magic 3
-				continue;
-			if (uartReceive() != 84) // magic 4
-				continue;
-			if (uartReceive() != 74) // magic 5
-				continue;
 
-			// ok, bootloader activated
-			activated = true;
-		}
-
-		if (command == BL_COMMAND_DEACTIVATE) // deactivate bootloader
-		{
-			activated = false;
-		}
-*/
 		if (command == BL_COMMAND_PING) // got challenge, send response -- identify itself
 		{
-			send_response(BL_COMMAND_PING, NULL, 0);
+			send_response(BL_COMMAND_PING, addr, NULL, 0);
 		}
 
-		if (command == BL_COMMAND_REBOOT) // restart whole device
+		if (command == BL_COMMAND_REBOOT) { // restart whole device
+			send_response(BL_COMMAND_REBOOT, addr, NULL, 0);
 			bootRestart();
-
-		if (command == BL_COMMAND_READ_PAGE) // 
-		{
-			memcpy_P(rx.data, *(uint8_t**)rx.data, SPM_PAGESIZE);
-			send_response(BL_COMMAND_READ_PAGE, rx.data, SPM_PAGESIZE);
 		}
 
-		if (command == BL_COMMAND_WRITE_PAGE)
-		{
+		if (command == BL_COMMAND_READ_PAGE) {
+			memcpy_P(rx.data, *(uint8_t**)rx.data, SPM_PAGESIZE);
+			send_response(BL_COMMAND_READ_PAGE, addr, rx.data, SPM_PAGESIZE);
+		}
+
+		if (command == BL_COMMAND_WRITE_PAGE) {
 			bootStorePage(*(uint32_t*)rx.data, rx.data + sizeof(uint32_t));
-			send_response(BL_COMMAND_WRITE_PAGE, NULL, 0);
+			send_response(BL_COMMAND_WRITE_PAGE, addr, NULL, 0);
 		}
 
 	}
