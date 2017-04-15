@@ -186,15 +186,15 @@ int main(void)
 		}
 		
 		if (msg_type == MessageType::ReadEepromPage) {
-			eeprom_read_block(rx.data, *(uint8_t**)rx.data, SPM_PAGESIZE);
+			eeprom_read_block(rx.data, *(uint8_t**)rx.data , SPM_PAGESIZE);
 			eeprom_busy_wait();
 			send_response(msg_type, addr, rx.data, SPM_PAGESIZE);
 		}
 
 		if (msg_type == MessageType::WriteEepromPage) {
-			eeprom_write_block(*(uint8_t**)rx.data, rx.data, SPM_PAGESIZE);
+			eeprom_write_block(rx.data + sizeof(uint16_t), *(uint8_t**)rx.data, SPM_PAGESIZE);
 			eeprom_busy_wait();
-			send_response(msg_type, addr, rx.data, SPM_PAGESIZE);
+			send_response(msg_type, addr, NULL, 0);
 		}
 
 	}
