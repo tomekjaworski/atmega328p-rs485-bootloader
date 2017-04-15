@@ -37,7 +37,7 @@ inline bool uartReceiveNoBlock(uint8_t& data)
 	return true;
 }
 
-inline uint8_t uartSend(uint8_t data)
+inline void uartSend(uint8_t data)
 {
 	UCSR0A |= _BV(TXC0);
 	UDR0 = data;

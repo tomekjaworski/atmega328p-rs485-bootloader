@@ -4,7 +4,7 @@
  * Created: 3/28/2017 22:10:49
  * Author : Tomek
  */ 
-
+#include <stddef.h>
 #include <avr/io.h>
 #include <util/crc16.h>
 #include <util/delay.h>
@@ -73,7 +73,7 @@ uint8_t receive_page(void)
 		uint8_t data = uartReceive();
 		*pdata++ = data;
 
-		if (cnt > sizeof(uint16_t))
+		if (cnt > (int)sizeof(uint16_t))
 			checksum -= data;
 	}
 
@@ -89,6 +89,32 @@ void txt(const char* ptr)
 	RS485_DIR_SEND;
 	while(*ptr)
 		uartSend(*ptr++);
+	RS485_DIR_RECEIVE;
+}
+
+void send_response(uint8_t command, const uint8_t* buffer, uint8_t count)
+{
+	uint16_t checksum = BOOTLOADER_HARDWARE_ADDRESS + command + count;
+
+	RS485_DIR_SEND;
+
+	// send header
+	uartSend(BOOTLOADER_HARDWARE_ADDRESS); // protocol: address
+	uartSend(command); // protocol: command
+	uartSend(count); // protocol: payload size
+
+	// send payload
+	while (count-- > 0)
+	{
+		checksum += *buffer;
+		uartSend(*buffer);
+		buffer++;
+	}
+
+	// send checksum
+	uartSend(checksum >> 8); // protocol: checksum's msb
+	uartSend(checksum & 0x00FF); // protocol: checksum's lsb
+
 	RS485_DIR_RECEIVE;
 }
 
@@ -127,7 +153,6 @@ int main(void)
 	
 	// 00 - uint8_t: address
 	// 01 - uint8_t: command
-	bool activated = false;
 	while(1)
 	{
 		// receive address
@@ -159,6 +184,8 @@ int main(void)
 		checksum -= (uint16_t)uartReceive() << 8;
 		checksum -= uartReceive();
 
+		//txt("chk");
+
 		if (checksum != 0)
 			continue; // error in message
 			/*
@@ -188,10 +215,7 @@ int main(void)
 */
 		if (command == BL_COMMAND_PING) // got challenge, send response -- identify itself
 		{
-			RS485_DIR_SEND;
-			uartSend(BOOTLOADER_HARDWARE_ADDRESS);
-			uartSend(BL_COMMAND_PING);
-			RS485_DIR_RECEIVE;
+			send_response(BL_COMMAND_PING, NULL, 0);
 		}
 
 		if (command == BL_COMMAND_REBOOT) // restart whole device
@@ -200,21 +224,13 @@ int main(void)
 		if (command == BL_COMMAND_READ_PAGE) // 
 		{
 			memcpy_P(rx.data, *(uint8_t**)rx.data, SPM_PAGESIZE);
-			RS485_DIR_SEND;
-			uartSend(BOOTLOADER_HARDWARE_ADDRESS);
-			uartSend(BL_COMMAND_READ_PAGE);
-			for (rx.ptr = rx.data, rx.endptr = rx.data + SPM_PAGESIZE; rx.endptr != rx.ptr; rx.ptr++)
-				uartSend(*rx.ptr);
-			RS485_DIR_RECEIVE;
+			send_response(BL_COMMAND_READ_PAGE, rx.data, SPM_PAGESIZE);
 		}
 
 		if (command == BL_COMMAND_WRITE_PAGE)
 		{
 			bootStorePage(*(uint32_t*)rx.data, rx.data + sizeof(uint32_t));
-			RS485_DIR_SEND;
-			uartSend(BOOTLOADER_HARDWARE_ADDRESS);
-			uartSend(BL_COMMAND_WRITE_PAGE);
-			RS485_DIR_RECEIVE;
+			send_response(BL_COMMAND_WRITE_PAGE, NULL, 0);
 		}
 
 	}
