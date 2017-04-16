@@ -184,7 +184,19 @@ namespace CnC
 
         #endregion
 
-        public void Dump(string filename)
+        public void Dump(string filename, DumpMode mode = DumpMode.Text)
+        {
+            if (mode == DumpMode.Text) InternalTextDump(filename);
+            if (mode == DumpMode.Binary) InternalBinaryDump(filename);
+        }
+
+        private void InternalBinaryDump(string filename)
+        {
+            using (FileStream fs = File.Create(filename))
+                fs.Write(this.mem, 0, this.mem.Length);
+        }
+
+        private void InternalTextDump(string filename)
         {
             int bytes_per_row = 16;
 
@@ -206,7 +218,7 @@ namespace CnC
                     for (int i = 0; i < to_read; i++)
                         if (this.mem[address + i] >= 32 && this.mem[address + i] <= 126)
                             sw.Write((char)this.mem[address + i]);
-                    else
+                        else
                             sw.Write(".");
                     sw.Write(" ");
 
@@ -226,14 +238,18 @@ namespace CnC
             //
         }
 
-        public bool BinaryCompare(MemoryMap mmread)
+        public bool BinaryCompare(MemoryMap mmread, ref uint difference_address)
         {
-            if (mmread.Size != this.Size)
+            if (mmread.Size != this.Size) {
+                difference_address = uint.MaxValue; //todo other method for extracting this information
                 return false; // size don't match
+            }
 
-            for (int i = 0; i < this.Size; i++)
-                if (mmread.mem[i] != this.mem[i])
+            for (uint i = 0; i < this.Size; i++)
+                if (mmread.mem[i] != this.mem[i]) {
+                    difference_address = i;
                     return false;
+                }
 
             return true;
         }

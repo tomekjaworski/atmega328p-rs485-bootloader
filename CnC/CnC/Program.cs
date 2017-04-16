@@ -54,7 +54,7 @@ namespace CnC
 
             List<Endpoint> endpoints = new List<Endpoint>();
 
-            
+            /*
             // get list of devices for each serial port
             foreach (SerialPort sp in ports)
                 AcquireDevicesOnSerialPort(endpoints, sp);
@@ -121,6 +121,81 @@ namespace CnC
            // mm.Dump("pobrane.txt");
         }
 
+        private static void ReadFLASH(Endpoint endpoint, MemoryMap dest)
+        {
+            Console.CursorVisible = false;
+
+            Console.Write("Reading FLASH memory ({0}kB):    ", dest.Size / 1024);
+            ConsoleProgressBar cpb = new ConsoleProgressBar(0, dest.Size);
+
+            for (uint addr = 0; addr < dest.Size; addr += 128, cpb.Progress = addr) {
+                Message msg_readpage = new Message((byte)endpoint.address, MessageType.ReadFlashPage, new byte[] { (byte)(addr & 0xFF), (byte)(addr >> 8), });
+
+                Message response = SendAndWaitForResponse(endpoint, msg_readpage, 2000);
+                dest.Write(addr, response.Payload, 0, 128);
+            }
+
+            Console.CursorVisible = true;
+            Console.WriteLine("Done.");
+        }
+
+        private static void WriteFLASH(Endpoint endpoint, MemoryMap source)
+        {
+            Console.CursorVisible = false;
+
+            Console.Write("Writing FLASH memory ({0}kB):    ", source.Size / 1024);
+            ConsoleProgressBar cpb = new ConsoleProgressBar(0, source.Size);
+
+            for (uint addr = 0; addr < source.Size; addr += 128, cpb.Progress = addr) {
+
+                byte[] payload = new byte[2 + 128];
+                payload[0] = (byte)(addr & 0xFF);
+                payload[1] = (byte)((addr >> 8) & 0xFF);
+                source.Read(addr, payload, 2, 128);
+
+                Message msg_write = new Message((byte)endpoint.address, MessageType.WriteFlashPage, payload);
+
+                Message response = SendAndWaitForResponse(endpoint, msg_write, 2000);
+            }
+
+            Console.CursorVisible = true;
+            Console.WriteLine("Done.");
+        }
+
+        private static bool VerifyFLASH(Endpoint endpoint, MemoryMap expected)
+        {
+            Console.CursorVisible = false;
+
+            Console.Write("Verifying FLASH memory ({0}kB):  ", expected.Size / 1024);
+            ConsoleProgressBar cpb = new ConsoleProgressBar(0, expected.Size);
+            MemoryMap mmread = new MemoryMap(expected.Size);
+
+            for (uint addr = 0; addr < expected.Size; addr += 128, cpb.Progress = addr) {
+                Message msg_readpage = new Message((byte)endpoint.address, MessageType.ReadFlashPage, new byte[] { (byte)(addr & 0xFF), (byte)(addr >> 8), });
+
+                Message response = SendAndWaitForResponse(endpoint, msg_readpage, 2000);
+                mmread.Write(addr, response.Payload, 0, 128);
+            }
+
+            UInt32 difference_address=0;
+            bool result = expected.BinaryCompare(mmread, ref difference_address);
+
+            Console.CursorVisible = true;
+            if (result)
+                Console.WriteLine("Correct.");
+            else {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("Failed.");
+                Console.ForegroundColor = ConsoleColor.Gray;
+
+                byte expected_byte = expected.ReadByte(difference_address);
+                byte existing_byte = mmread.ReadByte(difference_address);
+
+                throw new MemoryVerificationException("FLASH", difference_address, expected_byte, existing_byte);
+            }
+            return result;
+        }
+
         private static void ReadEEPROM(Endpoint endpoint, MemoryMap dest)
         {
             Console.CursorVisible = false;
@@ -128,7 +203,7 @@ namespace CnC
             Console.Write("Reading EEPROM memory ({0}kB):   ", dest.Size / 1024);
             ConsoleProgressBar cpb = new ConsoleProgressBar(0, dest.Size);
 
-            for (uint addr = 0; addr < 1 * 1024; addr += 128, cpb.Progress = addr) {
+            for (uint addr = 0; addr < dest.Size; addr += 128, cpb.Progress = addr) {
                 Message msg_readpage = new Message((byte)endpoint.address, MessageType.ReadEepromPage, new byte[] { (byte)(addr & 0xFF), (byte)(addr >> 8), });
 
                 Message response = SendAndWaitForResponse(endpoint, msg_readpage, 2000);
@@ -139,29 +214,37 @@ namespace CnC
             Console.WriteLine("Done.");
         }
 
-        private static bool VerifyEEPROM(Endpoint endpoint, MemoryMap source)
+        private static bool VerifyEEPROM(Endpoint endpoint, MemoryMap expected)
         {
             Console.CursorVisible = false;
 
-            Console.Write("Verifying EEPROM memory ({0}kB): ", source.Size / 1024);
-            ConsoleProgressBar cpb = new ConsoleProgressBar(0, source.Size);
-            MemoryMap mmread = new MemoryMap(source.Size);
+            Console.Write("Verifying EEPROM memory ({0}kB): ", expected.Size / 1024);
+            ConsoleProgressBar cpb = new ConsoleProgressBar(0, expected.Size);
+            MemoryMap mmread = new MemoryMap(expected.Size);
 
-            for (uint addr = 0; addr < 1 * 1024; addr += 128, cpb.Progress = addr) {
+            for (uint addr = 0; addr < expected.Size; addr += 128, cpb.Progress = addr) {
                 Message msg_readpage = new Message((byte)endpoint.address, MessageType.ReadEepromPage, new byte[] { (byte)(addr & 0xFF), (byte)(addr >> 8), });
 
                 Message response = SendAndWaitForResponse(endpoint, msg_readpage, 2000);
                 mmread.Write(addr, response.Payload, 0, 128);
             }
 
-            bool result = source.BinaryCompare(mmread);
+            UInt32 difference_address=0;
+            bool result = expected.BinaryCompare(mmread, ref difference_address);
 
             Console.CursorVisible = true;
             if (result)
                 Console.WriteLine("Correct.");
-            else
+            else {
+                Console.ForegroundColor = ConsoleColor.Red;
                 Console.WriteLine("Failed.");
+                Console.ForegroundColor = ConsoleColor.Gray;
 
+                byte expected_byte = expected.ReadByte(difference_address);
+                byte existing_byte = mmread.ReadByte(difference_address);
+
+                throw new MemoryVerificationException("FLASH", difference_address, expected_byte, existing_byte);
+            }
             return result;
         }
 
@@ -172,7 +255,7 @@ namespace CnC
             Console.Write("Writing EEPROM memory ({0}kB):   ", source.Size / 1024);
             ConsoleProgressBar cpb = new ConsoleProgressBar(0, source.Size);
 
-            for (uint addr = 0; addr < 1 * 1024; addr += 128, cpb.Progress = addr) {
+            for (uint addr = 0; addr < source.Size; addr += 128, cpb.Progress = addr) {
 
                 byte[] payload = new byte[2 + 128];
                 payload[0] = (byte)(addr & 0xFF);
@@ -188,7 +271,7 @@ namespace CnC
             Console.WriteLine("Done.");
         }
 
-        static Message SendAndWaitForResponse(Endpoint ep, Message request, int timeout, bool throw_timeout_exception = true)
+        private static Message SendAndWaitForResponse(Endpoint ep, Message request, int timeout, bool throw_timeout_exception = true)
         {
             Debug.Assert(ep.address == request.Address);
 
@@ -238,7 +321,6 @@ namespace CnC
 
             return msg;
         }
-
 
         private static void ShowDevices(Endpoint[] endpoints)
         {
@@ -405,7 +487,7 @@ namespace CnC
             for (int i = 0; i < width - pw; i++) this.content += '.';
 
             this.content += "] ";
-            this.content += (p * 100.0).ToString("N2") + "%";
+            this.content += (p * 100.0).ToString("N2") + "% ";
         }
 
         void Show()

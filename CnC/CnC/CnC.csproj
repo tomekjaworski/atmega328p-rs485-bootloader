@@ -44,11 +44,13 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ByteOrder.cs" />
+    <Compile Include="DumpMode.cs" />
     <Compile Include="FifoBuffer.cs" />
     <Compile Include="IntelHEXFormatException.cs" />
     <Compile Include="IntelHEX16Storage.cs" />
     <Compile Include="MemoryMap.cs" />
     <Compile Include="MemoryMapException.cs" />
+    <Compile Include="MemoryVerificationException.cs" />
     <Compile Include="Message.cs" />
     <Compile Include="MessageType.cs" />
     <Compile Include="Program.cs" />
