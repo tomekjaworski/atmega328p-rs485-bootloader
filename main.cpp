@@ -126,7 +126,7 @@ int main(void)
 		}
 
 		if (msg_type == MessageType::WriteEepromPage) {
-			eeprom_update_block(rx.data + sizeof(uint16_t), *(uint8_t**)rx.data, SPM_PAGESIZE);
+			eeprom_write_block(rx.data + sizeof(uint16_t), *(uint8_t**)rx.data, SPM_PAGESIZE);
 			eeprom_busy_wait();
 			send_response(msg_type, addr, NULL, 0);
 		}
