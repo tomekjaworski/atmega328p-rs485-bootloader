@@ -5,12 +5,15 @@
  *  Author: Tomek
  */ 
 
-
 #ifndef UART_H_
 #define UART_H_
 
 
+#define RS485_DIR_SEND		do { PORTD |= _BV(PORTD2); } while(0); //1
+#define RS485_DIR_RECEIVE	do { PORTD &= ~_BV(PORTD2); } while(0);//0
+
 void uartInitialize(void);
+void send_response(MessageType msg_type, uint8_t addr, const uint8_t* buffer, uint8_t count);
 
 
 
@@ -26,15 +29,6 @@ inline int uartReceiveNoBlock()
 		return -1;
 
 	return UDR0;
-}
-
-inline bool uartReceiveNoBlock(uint8_t& data)
-{
-	if (!(UCSR0A & _BV(RXC0))) // no data
-		return false;
-
-	data = UDR0;
-	return true;
 }
 
 inline void uartSend(uint8_t data)

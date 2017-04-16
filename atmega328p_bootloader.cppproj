@@ -196,6 +196,9 @@
     <Compile Include="boot.h">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="comm.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="fuses.cpp">
       <SubType>compile</SubType>
     </Compile>
