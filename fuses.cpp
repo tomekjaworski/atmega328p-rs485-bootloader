@@ -7,7 +7,8 @@
 
  #include <avr/io.h>
  #include <avr/fuse.h> // after IO
- 
+ #include <avr/lock.h>
+
  FUSES =
  {
 	 .low = 0xFF,
@@ -15,4 +16,5 @@
 	 .extended = FUSE_BODLEVEL0 & FUSE_BODLEVEL1,
  };
 
+ LOCKBITS = (BLB1_MODE_2);
 
