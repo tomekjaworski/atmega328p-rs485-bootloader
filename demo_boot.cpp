@@ -6,10 +6,11 @@
  */ 
 
 #include <avr/io.h>
+#include <util/delay.h>
 #include <stddef.h>
 #include "uart.h"
 
-void ___boot_demo(void) __attribute__ ((unused, section (".BL")));
+void ___boot_demo(void) __attribute__ ((__used__, section (".BL")));
 
 void ___boot_demo(void)
 {
@@ -25,9 +26,12 @@ void ___boot_demo(void)
 		UCSR0A |= _BV(TXC0);
 		UDR0 = arr[i];
 		while (!(UCSR0A & _BV(TXC0)));
-
+#if defined (DEBUG)
+		_delay_ms(100);
+#else
 		for (uint32_t j = 0; j < 1000000; j++)
 			asm volatile("nop");
+#endif
 	}
 	asm volatile("nop\n");
 	asm volatile("nop\n");
