@@ -43,6 +43,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="AVRBootloaderCnC.cs" />
     <Compile Include="ConsoleProgressBar.cs" />
     <Compile Include="ByteOrder.cs" />
     <Compile Include="Device.cs" />
