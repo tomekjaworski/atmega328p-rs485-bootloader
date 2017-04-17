@@ -17,30 +17,6 @@
 #define BOOTLOADER_HARDWARE_ADDRESS	(uint8_t)0x51
 
 
-
-void ___boot(void) __attribute__ ((unused, section (".BL")));
-
-void ___boot(void)
-{
-	uint8_t arr[3];
-	arr[0] = 'A'; arr[1] = 'B'; arr[2] = 'C';
-	asm volatile("nop\n");
-	asm volatile("nop\n");
-	asm volatile("nop\n");
-	RS485_DIR_SEND;
-
-	while(1)
-		for (uint8_t i = 0; i < 3; i++) {
-			UCSR0A |= _BV(TXC0);
-			UDR0 = arr[i];
-			while (!(UCSR0A & _BV(TXC0)));
-		}
-	asm volatile("nop\n");
-	asm volatile("nop\n");
-	asm volatile("nop\n");
-}
-
-
 static_assert(sizeof(const void *) == sizeof(uint16_t), "Pointer type different then 2; update the protocol!");
 static_assert(sizeof(MessageType) == sizeof(uint8_t), "sizeof(MessageType) == sizeof(uint8_t)");
 
@@ -65,7 +41,7 @@ int main(void)
 		//_delay_ms(1);
 		if (wait_counter++ > 2000) { // wait 2 secs
 #if defined (NDEBUG)
-			___boot();
+			___boot_demo();
 #endif
 			asm volatile("jmp 0000");
 		}
