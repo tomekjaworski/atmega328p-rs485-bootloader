@@ -21,7 +21,9 @@ enum class MessageType : uint8_t
 	ReadFlashPage = 'X',
 	WriteFlashPage = 'W',
 	ReadEepromPage = 'E',
-	WriteEepromPage = 'F'
+	WriteEepromPage = 'F',
+
+	ReadSignature = 'S'
 };
 
 struct RX {

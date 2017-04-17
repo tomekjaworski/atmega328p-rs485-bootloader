@@ -5,6 +5,7 @@
  * Author : Tomasz Jaworski
  */ 
 #include <avr/io.h>
+#include <avr/boot.h>
 #include <avr/pgmspace.h>
 #include <avr/eeprom.h>
 #include <util/crc16.h>
@@ -114,6 +115,12 @@ int main(void)
 			eeprom_write_block(rx.data + sizeof(uint16_t), *(uint8_t**)rx.data, SPM_PAGESIZE);
 			eeprom_busy_wait();
 			send_response(msg_type, addr, NULL, 0);
+		}
+
+		if (msg_type == MessageType::ReadSignature) {
+			for (uint8_t addr = 0x00; addr < 0x20; addr++)
+				rx.data[addr] = boot_signature_byte_get(addr);
+			send_response(msg_type, addr, rx.data, 0x20);
 		}
 
 	}

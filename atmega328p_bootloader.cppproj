@@ -217,6 +217,9 @@
     <Compile Include="main.cpp">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="signature.cpp">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="uart.cpp">
       <SubType>compile</SubType>
     </Compile>

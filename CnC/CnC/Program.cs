@@ -121,6 +121,22 @@ namespace CnC
            // mm.Dump("pobrane.txt");
         }
 
+        private static void ReadSignature(Endpoint endpoint, out byte[] signature)
+        {
+            Console.CursorVisible = false;
+            signature = null;
+
+            Console.Write("Reading AVR CPU signature (32b): ");
+
+            Message msg_readsig = new Message((byte)endpoint.address, MessageType.ReadSignature);
+            Message response = SendAndWaitForResponse(endpoint, msg_readsig, 2000);
+
+            signature = response.Payload;
+
+            Console.CursorVisible = true;
+            Console.WriteLine("Done.");
+        }
+
         private static void ReadFLASH(Endpoint endpoint, MemoryMap dest)
         {
             Console.CursorVisible = false;

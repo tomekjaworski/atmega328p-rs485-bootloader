@@ -17,6 +17,8 @@ namespace CnC
         ReadFlashPage = (byte)'X',
         WriteFlashPage = (byte)'W',
         ReadEepromPage = (byte)'E',
-        WriteEepromPage = (byte)'F'
+        WriteEepromPage = (byte)'F',
+
+        ReadSignature = (byte)'S',
     }
 }
