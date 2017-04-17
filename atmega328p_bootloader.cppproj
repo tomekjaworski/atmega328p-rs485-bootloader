@@ -205,6 +205,9 @@
     <Compile Include="comm.h">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="config.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="demo_boot.cpp">
       <SubType>compile</SubType>
     </Compile>

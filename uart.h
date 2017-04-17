@@ -8,6 +8,7 @@
 #ifndef UART_H_
 #define UART_H_
 
+#include "comm.h"
 
 #define RS485_DIR_SEND		do { PORTD |= _BV(PORTD2); } while(0); //1
 #define RS485_DIR_RECEIVE	do { PORTD &= ~_BV(PORTD2); } while(0);//0

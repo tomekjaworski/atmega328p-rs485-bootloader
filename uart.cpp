@@ -8,8 +8,9 @@
  #include <avr/io.h>
  #include "comm.h"
  #include "uart.h"
- 
- #define SERIAL_BAUD 19200	// 8E1 (!!!)
+ #include "config.h"
+
+
  #define SERIAL_UX2
 
  //////////////////////////////////////////////////////////////////////////

@@ -13,9 +13,7 @@
 #include "comm.h"
 #include "boot.h"
 #include "uart.h"
-
-#define BOOTLOADER_HARDWARE_ADDRESS	(uint8_t)0x51
-
+#include "config.h"
 
 static_assert(sizeof(const void *) == sizeof(uint16_t), "Pointer type different then 2; update the protocol!");
 static_assert(sizeof(MessageType) == sizeof(uint8_t), "sizeof(MessageType) == sizeof(uint8_t)");
