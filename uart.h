@@ -2,7 +2,7 @@
  * uart.h
  *
  * Created: 4/1/2017 13:34:02
- *  Author: Tomek
+ *  Author: Tomasz Jaworski
  */ 
 
 #ifndef UART_H_

@@ -2,7 +2,7 @@
  * boot.h
  *
  * Created: 3/31/2017 21:06:33
- *  Author: Tomek
+ *  Author: Tomasz Jaworski
  */ 
 
 

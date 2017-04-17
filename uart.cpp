@@ -2,7 +2,7 @@
  * uart.cpp
  *
  * Created: 4/1/2017 13:33:23
- *  Author: Tomek
+ *  Author: Tomasz Jaworski
  */ 
 
  #include <avr/io.h>

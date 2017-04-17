@@ -2,7 +2,7 @@
  * comm.h
  *
  * Created: 4/16/2017 23:29:05
- *  Author: Tomek
+ *  Author: Tomasz Jaworski
  */ 
 
 #ifndef COMM_H_

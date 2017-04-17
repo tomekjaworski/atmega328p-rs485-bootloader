@@ -2,7 +2,7 @@
  * fuses.cpp
  *
  * Created: 4/1/2017 13:34:32
- *  Author: Tomek
+ *  Author: Tomasz Jaworski
  */ 
 
  #include <avr/io.h>

@@ -2,7 +2,7 @@
  * boot.cpp
  *
  * Created: 3/31/2017 20:59:42
- *  Author: Tomek
+ *  Author: Tomasz Jaworski
  */ 
 
  #include <avr/boot.h>
