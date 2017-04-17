@@ -57,9 +57,18 @@ int main(void)
 		if (adv == 'A' )
 			break; // advert received - enter bootloader mode!!
 
-		_delay_ms(1);
-		if (wait_counter++ > 2000) // wait 2 secs
-			asm("jmp 0000");
+		// instead of _delay_ms(1) use loop. Execution time is similar
+		// in release mode, but binary code is shorter. In debug mode this doesn't matter.
+		for (int i = 0; i < 1660; i++)
+			asm volatile("nop");
+
+		//_delay_ms(1);
+		if (wait_counter++ > 2000) { // wait 2 secs
+#if defined (NDEBUG)
+			___boot();
+#endif
+			asm volatile("jmp 0000");
+		}
 	}
 
 	
