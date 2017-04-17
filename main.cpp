@@ -54,8 +54,13 @@ int main(void)
 	{
 		// receive address
 		uint8_t addr = uartReceive();
-		//if (addr != BOOTLOADER_HARDWARE_ADDRESS)
-		if (addr != BOOTLOADER_HARDWARE_ADDRESS && addr != 0x40&& addr != 0x50&& addr != 0x52&& addr != 0xF0)
+#if defined (DEBUG)
+		// in debug mode: respond to requests on multiple addresses
+		if (addr != BOOTLOADER_HARDWARE_ADDRESS && addr != 0x40&& addr != 0x50&& addr != 0x52&& addr != 0xB0)
+#else
+		// in release mode: respond only to the selected address
+		if (addr != BOOTLOADER_HARDWARE_ADDRESS)
+#endif
 			continue; // its not for me
 
 		// receive command
