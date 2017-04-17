@@ -43,7 +43,9 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ConsoleProgressBar.cs" />
     <Compile Include="ByteOrder.cs" />
+    <Compile Include="Device.cs" />
     <Compile Include="DumpMode.cs" />
     <Compile Include="FifoBuffer.cs" />
     <Compile Include="IntelHEXFormatException.cs" />
