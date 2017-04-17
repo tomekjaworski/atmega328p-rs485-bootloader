@@ -18,11 +18,12 @@
 
 
 
-void ___boot(void) __attribute__ ((section (".BL")));
+void ___boot(void) __attribute__ ((unused, section (".BL")));
 
 void ___boot(void)
 {
-	uint8_t arr[] = {'A','B','C'};
+	uint8_t arr[3];
+	arr[0] = 'A'; arr[1] = 'B'; arr[2] = 'C';
 	asm volatile("nop\n");
 	asm volatile("nop\n");
 	asm volatile("nop\n");
