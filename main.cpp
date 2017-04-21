@@ -39,7 +39,7 @@ int main(void)
 			asm volatile("nop");
 
 		//_delay_ms(1);
-		if (wait_counter++ > 2000) { // wait 2 secs
+		if (wait_counter++ > ADVERTISEMENT_WAIT_TIME) { // wait some time for bootloader activation byte
 #if defined (NDEBUG)
 			___boot_demo();
 #endif
