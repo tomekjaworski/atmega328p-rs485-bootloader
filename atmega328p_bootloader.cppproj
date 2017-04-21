@@ -120,7 +120,7 @@
   </avrgcccpp.linker.libraries.Libraries>
   <avrgcccpp.linker.memorysettings.Flash>
     <ListValues>
-      <Value>.text=0x3800</Value>
+      <Value>.text=0x3E00</Value>
       <Value>.BL=0x20</Value>
     </ListValues>
   </avrgcccpp.linker.memorysettings.Flash>
