@@ -19,6 +19,17 @@
 static_assert(sizeof(const void *) == sizeof(uint16_t), "Pointer type different then 2; update the protocol!");
 static_assert(sizeof(MessageType) == sizeof(uint8_t), "sizeof(MessageType) == sizeof(uint8_t)");
 
+#if !defined (DEBUG)
+void __reset(void) __attribute__ ((naked, section(".init9")));
+void __reset(void)
+{
+	asm volatile (".set __stack, RAMEND");
+	SP = RAMEND;
+	asm volatile ("clr __zero_reg__"); 
+	asm volatile ("rjmp main");
+}
+#endif
+
 
 int main(void)
 {
