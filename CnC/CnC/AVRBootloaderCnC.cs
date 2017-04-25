@@ -60,7 +60,6 @@ namespace CnC
             this.opened_ports = list.ToArray();
         }
 
-
         public void SendAdvertisement()
         {
             byte[] req;
@@ -154,6 +153,21 @@ namespace CnC
             }
         }
 
+
+        public void ReadVersion(Device dev, ref string ver)
+        {
+            Console.CursorVisible = false;
+
+            Console.Write("Reading bootloader fw version:   ");
+
+            Message msg_readfwver = new Message((byte)dev.address, MessageType.ReadBootloaderVersion);
+            Message response = SendAndWaitForResponse(dev, msg_readfwver, 2000);
+
+            ver = Encoding.ASCII.GetString(response.Payload, 0, response.Payload.Length - 1);
+
+            Console.CursorVisible = true;
+            Console.WriteLine(ver);
+        }
 
 
         public void ReadSignature(Device endpoint, out byte[] signature)

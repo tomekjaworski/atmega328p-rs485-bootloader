@@ -20,5 +20,7 @@ namespace CnC
         WriteEepromPage = (byte)'F',
 
         ReadSignature = (byte)'S',
+
+        ReadBootloaderVersion = (byte)'V',
     }
 }

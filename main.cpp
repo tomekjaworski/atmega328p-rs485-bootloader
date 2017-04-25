@@ -139,6 +139,19 @@ int main(void)
 			send_response(msg_type, addr, rx.data, 0x20);
 		}
 
+		if (msg_type == MessageType::ReadBootloaderVersion) {
+
+			#define STR_HELPER(x) #x
+			#define STR(x) STR_HELPER(x)
+
+			char ver[] = "v=" STR(PROTOCOL_VERSION) ";d=" __DATE__ ";t=" __TIME__;
+			send_response(msg_type, addr, (const uint8_t*)ver, sizeof(ver));
+			
+
+			#undef STR_HELPER
+			#undef STR
+		}
+
 	}
 
 	

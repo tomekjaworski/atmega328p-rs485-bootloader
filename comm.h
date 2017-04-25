@@ -23,7 +23,9 @@ enum class MessageType : uint8_t
 	ReadEepromPage = 'E',
 	WriteEepromPage = 'F',
 
-	ReadSignature = 'S'
+	ReadSignature = 'S',
+
+	ReadBootloaderVersion = 'V'
 };
 
 struct RX {
