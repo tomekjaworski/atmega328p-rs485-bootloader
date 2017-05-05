@@ -10,34 +10,154 @@ using System.Threading.Tasks;
 namespace CnC
 {
 
+    
+
     public class AVRBootloaderCnC
     {
-        SerialPort[] available_ports;
-        SerialPort[] opened_ports;
+        List<SerialPort> available_ports;
+        List<string> excluded_port_names;
 
-        public SerialPort[] OpenedSerialPorts => this.opened_ports.Clone() as SerialPort[];
+//        SerialPort[] opened_ports;
 
-        public AVRBootloaderCnC(SerialPort[] ports = null)
+        //public SerialPort[] OpenedSerialPorts => this.opened_ports.Clone() as SerialPort[];
+
+        public AVRBootloaderCnC()
         {
-            if (ports == null)
-                this.available_ports = this.GetAllSerialPorts();
-            else
-                this.available_ports = ports.Clone() as SerialPort[];
+            this.available_ports = new List<SerialPort>();
+            this.excluded_port_names = new List<string>();
+
+          //  if (ports == null)
+                //this.available_ports = this.GetAllSerialPorts();
+            //else
+              //  this.available_ports = ports.Clone() as SerialPort[];
         }
 
-        private SerialPort[] GetAllSerialPorts()
+        internal void AcquireBootloaders()
         {
-            SerialPort[] ports = SerialPort.GetPortNames().Select(x => new SerialPort(x, 19200, Parity.Even, 8, StopBits.One)).ToArray();
-            return ports;
+            List<Device> devices = new List<Device>();
+            foreach (SerialPort sp in available_ports)
+                devices.AddRange(AcquireDevicesOnSerialPort(sp));
+
         }
 
-        public void ShowAvailableSerialPorts()
+        /*
+private SerialPort[] GetAllSerialPorts()
+{
+   SerialPort[] ports = SerialPort.GetPortNames().Select(x => new SerialPort(x, 19200, Parity.Even, 8, StopBits.One)).ToArray();
+   return ports;
+}
+
+public void ShowAvailableSerialPorts()
+{
+   Console.WriteLine("Available serial ports: {0}",
+       String.Join(", ", this.available_ports.Select(x => x.PortName).ToArray()));
+}*/
+
+
+
+        private async  Task SerialPortOpenerThread(CancellationToken ct)
         {
-            Console.WriteLine("Available serial ports: {0}",
-                String.Join(", ", this.available_ports.Select(x => x.PortName).ToArray()));
+            List<string> port_names_to_open = new List<string>();
+
+            while (!ct.IsCancellationRequested) {
+                lock (this.available_ports)
+                    foreach (string port_name in SerialPort.GetPortNames()) {
+                        SerialPort sp = available_ports.Find(x => x.PortName == port_name);
+                        if (sp != null)
+                            continue; // ok, this port was previoulsy opened
+
+                        port_names_to_open.Add(port_name);
+                    }
+
+                while (port_names_to_open.Count > 0) {
+                    String port_name = port_names_to_open[0];
+                    try {
+                        SerialPort sp = new SerialPort(port_name, 19200, Parity.Even, 8, StopBits.One);
+
+                        sp.ReadTimeout = 200;
+                        sp.Open();
+                        port_names_to_open.Remove(port_name);
+                        lock (this.available_ports)
+                            this.available_ports.Add(sp);
+                    }
+                    catch (Exception ex) {
+                        // Console.WriteLine("Failed");
+                    }
+
+                }
+
+                await Task.Delay(100);
+
+                ////list.Add(sp); // use only opened ports
+                //show_intro = true;
+                //}
+            }
         }
 
 
+
+
+
+        public void SendAdvertisementToEveryDetectedPort()
+        {
+            Console.WriteLine("*** TURN ON all devices and press any key to processed...\n");
+            char[] anim = { '/', '-', '\\', '|' };
+            int anim_counter = 0;
+            int cx = 0;
+
+            Console.CursorVisible = false;
+            cx = Console.CursorLeft;
+
+            CancellationTokenSource cts = new CancellationTokenSource();
+            Task t = SerialPortOpenerThread(cts.Token);
+
+            while (!Console.KeyAvailable) {
+
+                Thread.Sleep(100);
+
+                Console.CursorLeft = cx;
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.Write("Sending C&C Advertisement to {0} serial ports: ", this.available_ports.Count);
+                Console.ForegroundColor = ConsoleColor.Gray;
+                Console.Write(anim[anim_counter++ % 4]);
+
+                // send advertisement to ports on list
+                List<SerialPort> lost_ports = new List<SerialPort>();
+                byte[] req = new byte[] { (byte)'A' };
+
+                lock (this.available_ports)
+                    foreach (SerialPort out_port in available_ports)
+                        try {
+                            if (out_port.IsOpen)
+                                out_port.Write(req, 0, 1);
+                        }
+                        catch (Exception ex) {
+                            lost_ports.Add(out_port);
+                        }
+
+                // remove lost ports
+                lock (this.available_ports)
+                    foreach (SerialPort lp in lost_ports)
+                        this.available_ports.Remove(lp);
+
+            }
+
+            cts.Cancel();
+            Task.WaitAll(t);
+        }
+
+        private async void OpenSerialPort(SerialPort sp, List<SerialPort> list)
+        {
+            try {
+
+
+            }
+            catch (Exception ex) {
+                list.Remove(sp);
+            }
+
+        }
+        /*
         public void OpenAllSerialPorts()
         {
             // open all ports
@@ -90,10 +210,10 @@ namespace CnC
             this.PurgeSerialPorts();
         }
 
-
+        */
         public Device[] AcquireDevicesOnSerialPort(SerialPort sp)
         {
-            Console.WriteLine("Sending PING to serial port {0}... ", sp.PortName);
+            Console.WriteLine("\nSending PING to serial port {0}... ", sp.PortName);
             Console.CursorVisible = false;
 
             bool intro = true;
@@ -152,7 +272,7 @@ namespace CnC
                 Console.WriteLine("   Device 0x{0:X2} on {1}", ep.address, ep.sp.PortName);
             }
         }
-
+        /*
 
         public void ReadVersion(Device dev, ref string ver)
         {
@@ -335,12 +455,12 @@ namespace CnC
             Console.CursorVisible = true;
             Console.WriteLine("Done.");
         }
-
+        */
 
         private void PurgeSerialPorts()
         {
             Thread.Sleep(100);
-            foreach (SerialPort sp in this.opened_ports) {
+            foreach (SerialPort sp in this.available_ports) {
                 sp.DiscardInBuffer();
                 sp.DiscardOutBuffer();
             }

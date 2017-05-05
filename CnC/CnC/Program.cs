@@ -25,26 +25,27 @@ namespace CnC
            // mm.Dump("test.txt");
 
 
-            if (SerialPort.GetPortNames().Length == 0) {
-                Console.WriteLine("No serial ports available, quitting...");
-                return;
-            }
+            //if (SerialPort.GetPortNames().Length == 0) {
+            //    Console.WriteLine("No serial ports available, quitting...");
+            //    return;
+            //}
 
             AVRBootloaderCnC cnc = new AVRBootloaderCnC();
 
             // open all available serial ports
-            cnc.OpenAllSerialPorts();
+            //cnc.OpenAllSerialPorts();
 
             // start sending advertisements and wait unit user's reaction
-            cnc.SendAdvertisement();
+            //cnc.SendAdvertisement();
 
-            List<Device> devices = new List<Device>();
-            foreach (SerialPort sp in cnc.OpenedSerialPorts)
-                devices.AddRange(cnc.AcquireDevicesOnSerialPort(sp));
+            cnc.SendAdvertisementToEveryDetectedPort();
+
+
+            cnc.AcquireBootloaders();
 
             // show found devices
-            cnc.ShowDevices(devices.ToArray());
-
+            //cnc.ShowDevices(devices.ToArray());
+/*
             Console.WriteLine("Reading bootloader version and signature");
             foreach (Device dev in devices)
             {
@@ -86,7 +87,7 @@ namespace CnC
             }
 
             #endregion
-
+            */
 
             /*
             List<SerialPort> ports = ListAndOpenSerialPorts();
@@ -148,7 +149,7 @@ namespace CnC
                         eeprom.Dump("eeprom2d.txt");
                         */
 
-            byte[] sig;
+            //byte[] sig;
             //ReadSignature(endpoints[0], out sig);
 
         }
