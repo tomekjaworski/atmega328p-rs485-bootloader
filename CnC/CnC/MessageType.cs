@@ -9,7 +9,7 @@ namespace CnC
     public enum MessageType : byte
     {
         Activate = (byte)'A',
-        Deactivate = (byte)'B',
+        //Deactivate = (byte)'B',
 
         Ping = (byte)'?',
         Reboot = (byte)'R',

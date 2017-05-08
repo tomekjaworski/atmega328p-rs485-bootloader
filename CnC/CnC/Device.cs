@@ -18,5 +18,9 @@ namespace CnC
             this.address = addr;
         }
 
+        public override string ToString()
+        {
+            return string.Format("0x{0:X2} on {1}", address, sp.PortName);
+        }
     }
 }

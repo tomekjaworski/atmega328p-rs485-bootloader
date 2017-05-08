@@ -41,13 +41,13 @@ namespace CnC
             cnc.SendAdvertisementToEveryDetectedPort();
 
 
-            cnc.AcquireBootloaders();
+            cnc.AcquireBootloaderDevices(0x20);
 
             // show found devices
-            //cnc.ShowDevices(devices.ToArray());
-/*
+            cnc.ShowDevices();
+
             Console.WriteLine("Reading bootloader version and signature");
-            foreach (Device dev in devices)
+            foreach (Device dev in cnc.Devices)
             {
                 Console.WriteLine("Reading device {0:X2}... ", dev.address);
 
@@ -58,8 +58,10 @@ namespace CnC
                 // read CPU signature
                 byte[] bsig = null;
                 cnc.ReadSignature(dev, out bsig);
-            }
 
+              //  Console.WriteLine("{0:X2}: {1}", dev.address, ver);
+            }
+            /*
             #region DEMO 1 - Download EEPROM from all found devices
             Console.WriteLine("Reading EEPROM and Flash memories...");
 

@@ -17,42 +17,25 @@ namespace CnC
         List<SerialPort> available_ports;
         List<string> excluded_port_names;
 
-//        SerialPort[] opened_ports;
+        List<Device> discovered_devices;
 
-        //public SerialPort[] OpenedSerialPorts => this.opened_ports.Clone() as SerialPort[];
+        public Device[] Devices => this.discovered_devices.ToArray();
 
         public AVRBootloaderCnC()
         {
             this.available_ports = new List<SerialPort>();
             this.excluded_port_names = new List<string>();
+            this.discovered_devices = new List<Device>();
 
-          //  if (ports == null)
-                //this.available_ports = this.GetAllSerialPorts();
-            //else
-              //  this.available_ports = ports.Clone() as SerialPort[];
         }
 
-        internal void AcquireBootloaders()
+        internal void AcquireBootloaderDevices(byte max_addr)
         {
-            List<Device> devices = new List<Device>();
             foreach (SerialPort sp in available_ports)
-                devices.AddRange(AcquireDevicesOnSerialPort(sp));
+                this.discovered_devices.AddRange(AcquireDevicesOnSerialPort(sp, max_addr));
 
+            this.discovered_devices.Sort((x, y) => x.address - y.address);
         }
-
-        /*
-private SerialPort[] GetAllSerialPorts()
-{
-   SerialPort[] ports = SerialPort.GetPortNames().Select(x => new SerialPort(x, 19200, Parity.Even, 8, StopBits.One)).ToArray();
-   return ports;
-}
-
-public void ShowAvailableSerialPorts()
-{
-   Console.WriteLine("Available serial ports: {0}",
-       String.Join(", ", this.available_ports.Select(x => x.PortName).ToArray()));
-}*/
-
 
 
         private async  Task SerialPortOpenerThread(CancellationToken ct)
@@ -87,10 +70,6 @@ public void ShowAvailableSerialPorts()
                 }
 
                 await Task.Delay(100);
-
-                ////list.Add(sp); // use only opened ports
-                //show_intro = true;
-                //}
             }
         }
 
@@ -145,73 +124,8 @@ public void ShowAvailableSerialPorts()
             cts.Cancel();
             Task.WaitAll(t);
         }
-
-        private async void OpenSerialPort(SerialPort sp, List<SerialPort> list)
-        {
-            try {
-
-
-            }
-            catch (Exception ex) {
-                list.Remove(sp);
-            }
-
-        }
-        /*
-        public void OpenAllSerialPorts()
-        {
-            // open all ports
-            List<SerialPort> list = new List<SerialPort>();
-            foreach (SerialPort sp in this.available_ports) {
-                try {
-                    Console.Write("Opening {0}... ", sp.PortName);
-                    sp.ReadTimeout = 200;
-                    sp.Open();
-                    Console.WriteLine("Ok");
-
-                    list.Add(sp); // use only opened ports
-
-                }
-                catch (Exception ex) {
-                    Console.WriteLine("Error: {0}", ex.Message);
-                }
-            }
-
-            this.opened_ports = list.ToArray();
-        }
-
-        public void SendAdvertisement()
-        {
-            byte[] req;
-            Console.WriteLine("*** TURN ON all devices and press any key to processed...");
-            char[] anim = { '/', '-', '\\', '|' };
-            int anim_counter = 0;
-
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.Write("\nSending C&C Advertisement to {0} serial ports: ", this.opened_ports.Length);
-            Console.ForegroundColor = ConsoleColor.Gray;
-
-            Console.CursorVisible = false;
-            int cx = Console.CursorLeft;
-
-            while (!Console.KeyAvailable) {
-                req = new byte[] { (byte)'A' };
-                foreach (SerialPort sp in this.opened_ports)
-                    sp.Write(req, 0, 1);
-
-                Thread.Sleep(100);
-                Console.CursorLeft = cx;
-                Console.Write(anim[anim_counter++ % 4]);
-            }
-
-            Console.WriteLine(" Done.");
-            Console.CursorVisible = true;
-
-            this.PurgeSerialPorts();
-        }
-
-        */
-        public Device[] AcquireDevicesOnSerialPort(SerialPort sp)
+        
+        public Device[] AcquireDevicesOnSerialPort(SerialPort sp, byte max_addr)
         {
             Console.WriteLine("\nSending PING to serial port {0}... ", sp.PortName);
             Console.CursorVisible = false;
@@ -219,7 +133,8 @@ public void ShowAvailableSerialPorts()
             bool intro = true;
             int cx = 0, cy = 0;
 
-            int timeout = 200;
+            int timeout = 100;
+            int counter = 0;
 
             sp.ReadTimeout = 20;
             byte[] buffer = new byte[1024];
@@ -227,10 +142,12 @@ public void ShowAvailableSerialPorts()
             List<Device> endpoints = new List<Device>();
 
             // scan through 0x00 - 0xEF. Range 0xF0 - 0xFF is reserved
-            for (int i = 0x00; i < 0xF0; i++) {
+            max_addr = Math.Min(max_addr, (byte)0xF0);
 
+            for (int i = 0x00; i < max_addr; i++) {
+              //i = 0x12;
                 if (intro) {
-                    Console.Write("Looking for device ");
+                    Console.Write(" Looking for device ");
                     cx = Console.CursorLeft;
                     cy = Console.CursorTop;
                     intro = false;
@@ -248,31 +165,61 @@ public void ShowAvailableSerialPorts()
                 me.Discard();
 
                 Message ping_message = new Message((byte)i, MessageType.Ping);
-                Message msg = SendAndWaitForResponse(new Device(sp, i), ping_message, 50, false, 0);
+                Message msg = SendAndWaitForResponse(new Device(sp, i), ping_message, timeout, false, 0);
 
                 if (msg != null) {
                     Console.WriteLine(" Found!");
+                    counter++;
                     intro = true;
                     endpoints.Add(new Device(sp, i));
                 }
+
+                //break;
             }
 
+            Console.SetCursorPosition(0, cy);
+            Console.WriteLine(" Done. Found {0} devices on serial port {1}.", counter, sp.PortName);
             Console.CursorVisible = true;
             return endpoints.ToArray();
         }
 
 
-        public void ShowDevices(Device[] endpoints)
+        public void ShowDevices()
         {
+            Console.WriteLine("\nListing {0} discovered device(s): ", discovered_devices.Count);
+
+            // group them against serial port
+            Dictionary<string, List<Device>> devs = new Dictionary<string, List<Device>>();
+            foreach (Device dev in this.discovered_devices) {
+                if (!devs.ContainsKey(dev.sp.PortName))
+                    devs[dev.sp.PortName] = new List<Device>();
+
+                devs[dev.sp.PortName].Add(dev);
+            }
+
+            // sort them
+            foreach(List<Device> sp_devs in devs.Values) 
+                sp_devs.Sort((x, y) => x.address - y.address);
+
+            // and show them
+            foreach (string key in devs.Keys) {
+                List<Device> sp_devs = devs[key];
+                Console.Write(" Port {0:010}: ", key.PadRight(5));
+
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine(string.Join(" ", sp_devs.Select(x => x.address.ToString("X2"))));
+                Console.ForegroundColor = ConsoleColor.Gray;
+            }
+
+            // and show them again, but together for better view in case of holes in addresses
+
+            discovered_devices.Sort((x, y) => x.address - y.address);
+            Console.Write(" Concatenated list: ");
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("\nListing {0} discovered device(s): ", endpoints.Length);
+            Console.WriteLine( string.Join(" ", discovered_devices.Select(x => x.address.ToString("X2"))));
             Console.ForegroundColor = ConsoleColor.Gray;
 
-            foreach (Device ep in endpoints) {
-                Console.WriteLine("   Device 0x{0:X2} on {1}", ep.address, ep.sp.PortName);
-            }
         }
-        /*
 
         public void ReadVersion(Device dev, ref string ver)
         {
@@ -303,7 +250,7 @@ public void ShowAvailableSerialPorts()
             signature = response.Payload;
 
             Console.CursorVisible = true;
-            Console.WriteLine("Done.");
+            Console.WriteLine("Done ({0:X2} {1:X2} {2:X2}).", signature[0], signature[2], signature[4]);
         }
 
         public void ReadFLASH(Device endpoint, MemoryMap dest)
@@ -455,7 +402,6 @@ public void ShowAvailableSerialPorts()
             Console.CursorVisible = true;
             Console.WriteLine("Done.");
         }
-        */
 
         private void PurgeSerialPorts()
         {
@@ -472,6 +418,7 @@ public void ShowAvailableSerialPorts()
 
             MessageExtractor me = new MessageExtractor();
             byte[] buffer = new byte[1024];
+            byte[] empty = new byte[128+4+5];
 
             Message msg = null;
 
@@ -481,6 +428,9 @@ public void ShowAvailableSerialPorts()
                 ep.sp.DiscardInBuffer();
                 ep.sp.DiscardOutBuffer();
                 ep.sp.ReadTimeout = 20;
+
+                // resync
+                ep.sp.Write(empty, 0, empty.Length);
 
                 // send data
                 ep.sp.Write(request.Binary, 0, request.BinarySize);
