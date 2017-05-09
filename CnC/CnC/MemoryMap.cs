@@ -160,6 +160,14 @@ namespace CnC
             return value;
         }
 
+        internal void Zero()
+        {
+            for (int i = 0; i < this.mem.Length; i++) {
+                mem[i] = 0;
+                dirty[i] = false;
+            }
+        }
+
         public UInt16 ReadUInt32(UInt32 address)
         {
             uint b0 = ReadByte(address);

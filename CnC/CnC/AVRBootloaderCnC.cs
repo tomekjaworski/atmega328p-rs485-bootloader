@@ -21,12 +21,15 @@ namespace CnC
 
         public Device[] Devices => this.discovered_devices.ToArray();
 
+        Random random;
+
+
         public AVRBootloaderCnC()
         {
             this.available_ports = new List<SerialPort>();
             this.excluded_port_names = new List<string>();
             this.discovered_devices = new List<Device>();
-
+            this.random =  new Random();
         }
 
         internal void AcquireBootloaderDevices(byte max_addr)
@@ -73,8 +76,30 @@ namespace CnC
             }
         }
 
+        public bool Ping(Device dev, int timeout)
+        {
+            int x = this.random.Next();
+            byte[] payload = BitConverter.GetBytes(x);
 
+            Message ping_message = new Message((byte)dev.address, MessageType.Ping, payload);
+            Message msg = SendAndWaitForResponse(dev, ping_message, timeout, false);
 
+            // check if there was a response
+            if (msg == null)
+                return false;
+            
+            // check if the received payload size is the same as sent
+            if (msg.Payload.Length != 4)
+                return false;
+
+            // compare the contents
+            for (int i = 0; i < 4; i++)
+                if (payload[i] != msg.Payload[i])
+                    return false;
+                    
+            // well, ok then
+            return true;
+        }
 
 
         public void SendAdvertisementToEveryDetectedPort()
@@ -107,8 +132,10 @@ namespace CnC
                 lock (this.available_ports)
                     foreach (SerialPort out_port in available_ports)
                         try {
-                            if (out_port.IsOpen)
+                            //if (out_port.IsOpen)
                                 out_port.Write(req, 0, 1);
+                            //else
+                                //out_port.Dispose();
                         }
                         catch (Exception ex) {
                             lost_ports.Add(out_port);
@@ -397,6 +424,8 @@ namespace CnC
                 Message msg_write = new Message((byte)endpoint.address, MessageType.WriteEepromPage, payload);
 
                 Message response = SendAndWaitForResponse(endpoint, msg_write, 2000);
+                if (response.Type != MessageType.WriteEepromPage)
+                    throw new CnCException("response.Type");
             }
 
             Console.CursorVisible = true;
@@ -428,9 +457,6 @@ namespace CnC
                 ep.sp.DiscardInBuffer();
                 ep.sp.DiscardOutBuffer();
                 ep.sp.ReadTimeout = 20;
-
-                // resync
-                ep.sp.Write(empty, 0, empty.Length);
 
                 // send data
                 ep.sp.Write(request.Binary, 0, request.BinarySize);

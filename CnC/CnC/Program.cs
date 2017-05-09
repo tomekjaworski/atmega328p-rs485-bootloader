@@ -14,10 +14,11 @@ namespace CnC
 
     class Program
     {
+        static Random random;
         static void Main(string[] args)
         {
             Console.WriteLine("SmartTable bootloader C&C software by Tomasz Jaworski");
-
+            random = new Random();
 
             //MemoryMap mm = new MemoryMap(0x10000);
            // IntelHEX16Storage st = new IntelHEX16Storage(mm);
@@ -32,14 +33,7 @@ namespace CnC
 
             AVRBootloaderCnC cnc = new AVRBootloaderCnC();
 
-            // open all available serial ports
-            //cnc.OpenAllSerialPorts();
-
-            // start sending advertisements and wait unit user's reaction
-            //cnc.SendAdvertisement();
-
             cnc.SendAdvertisementToEveryDetectedPort();
-
 
             cnc.AcquireBootloaderDevices(0x20);
 
@@ -58,14 +52,14 @@ namespace CnC
                 // read CPU signature
                 byte[] bsig = null;
                 cnc.ReadSignature(dev, out bsig);
-
-              //  Console.WriteLine("{0:X2}: {1}", dev.address, ver);
             }
-            /*
-            #region DEMO 1 - Download EEPROM from all found devices
-            Console.WriteLine("Reading EEPROM and Flash memories...");
 
-            foreach (Device dev in devices)
+
+            #region DEMO 1 - Download EEPROM from all found devices
+            
+            Console.WriteLine("Reading EEPROM and Flash memories...");
+            
+            foreach (Device dev in cnc.Devices)
             {
                 Console.WriteLine("Reading device {0:X2}... ", dev.address);
 
@@ -84,12 +78,95 @@ namespace CnC
                 fname = string.Format("flash_{0:X2}", dev.address);
                 mm.Dump(fname + ".txt", DumpMode.Text);
                 mm.Dump(fname + ".bin", DumpMode.Binary);
+            }
+            
+            #endregion
 
 
+            #region DEMO 2 - Increment a counter in eeprom (@ 0x0A) and in flash (@ 0x0100)
+            /*
+            Console.WriteLine("Reading EEPROM and Flash memories...");
+
+            foreach (Device dev in cnc.Devices) {
+                Console.WriteLine("Reading device {0:X2}... ", dev.address);
+
+                // read eeprom
+                MemoryMap mm = new MemoryMap(1024);
+                cnc.ReadEEPROM(dev, mm);
+
+                UInt16 a = mm.ReadUInt16(10);
+                if (a == 0xffff)
+                    a = 0;
+                else
+                    a++;
+                mm.Write(10, a);
+                cnc.WriteEEPROM(dev, mm);
+                Console.WriteLine("A=" + a.ToString());
             }
 
-            #endregion
+
+            foreach (Device dev in cnc.Devices) {
+                Console.WriteLine("Reading device {0:X2}... ", dev.address);
+
+                // read eeprom
+                MemoryMap mm = new MemoryMap(32*1024);
+                cnc.ReadFLASH(dev, mm);
+
+                UInt16 a = mm.ReadUInt16(0x100);
+                if (a == 0xffff)
+                    a = 0;
+                else
+                    a++;
+                mm.Write(0x100, a);
+                cnc.WriteFLASH(dev, mm);
+                Console.WriteLine("A=" + a.ToString());
+            }
             */
+
+
+            #endregion
+
+            #region  DEMO 3 - fill eeprom and flash with random data
+            /*
+            foreach (Device dev in cnc.Devices) {
+                // read eeprom
+                MemoryMap mm = new MemoryMap(1024);
+                for (uint i = 0; i < 1024; i++)
+                    mm.Write(i, (byte)random.Next());
+
+                cnc.WriteEEPROM(dev, mm);
+                string fname = string.Format("eeprom_random_written_{0:X2}", dev.address);
+                mm.Dump(fname + ".txt", DumpMode.Text);
+                mm.Dump(fname + ".bin", DumpMode.Binary);
+
+                mm.Zero();
+
+                cnc.ReadEEPROM(dev, mm);
+                fname = string.Format("eeprom_random_read_{0:X2}", dev.address);
+                mm.Dump(fname + ".txt", DumpMode.Text);
+                mm.Dump(fname + ".bin", DumpMode.Binary);
+            }
+
+            foreach (Device dev in cnc.Devices) {
+                // read eeprom
+                MemoryMap mm = new MemoryMap(32*1024);
+                for (uint i = 0; i < mm.Size; i++)
+                    mm.Write(i, (byte)random.Next());
+
+                cnc.WriteFLASH(dev, mm);
+                string fname = string.Format("flash_random_written_{0:X2}", dev.address);
+                mm.Dump(fname + ".txt", DumpMode.Text);
+                mm.Dump(fname + ".bin", DumpMode.Binary);
+
+                mm.Zero();
+
+                cnc.ReadFLASH(dev, mm);
+                fname = string.Format("flash_random_read_{0:X2}", dev.address);
+                mm.Dump(fname + ".txt", DumpMode.Text);
+                mm.Dump(fname + ".bin", DumpMode.Binary);
+            }
+            */
+            #endregion
 
             /*
             List<SerialPort> ports = ListAndOpenSerialPorts();
