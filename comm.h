@@ -31,6 +31,8 @@ enum class MessageType : uint8_t
 struct RX {
 	uint8_t data[MAX_PAYLOAD_SIZE];
 	uint8_t *ptr, *endptr;
+
+	bool timeout;
 };
 
 extern RX rx;

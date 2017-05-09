@@ -18,11 +18,8 @@ void send_response(MessageType msg_type, uint8_t addr, const uint8_t* buffer, ui
 
 
 
-inline uint8_t uartReceive()
-{
-	while (!(UCSR0A & _BV(RXC0)));
-	return UDR0;
-}
+uint8_t uartReceive();
+
 
 inline int uartReceiveNoBlock()
 {

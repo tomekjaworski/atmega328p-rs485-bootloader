@@ -65,6 +65,8 @@ int main(void)
 	{
 		// receive address
 		uint8_t addr = uartReceive();
+		if (rx.timeout) continue;
+
 #if defined (DEBUG)
 		// in debug mode: respond to requests on multiple addresses
 		if (addr != BOOTLOADER_HARDWARE_ADDRESS && addr != 0x40&& addr != 0x50&& addr != 0x52&& addr != 0xB0)
@@ -76,9 +78,12 @@ int main(void)
 
 		// receive command
 		MessageType msg_type = (MessageType)uartReceive();
+		if (rx.timeout) continue;
 
 		// receive payload length
 		uint8_t payload_size = uartReceive();
+		if (rx.timeout) continue;
+
 
 		if (payload_size > MAX_PAYLOAD_SIZE)
 			continue; // something is wrong
@@ -90,13 +95,19 @@ int main(void)
 		rx.endptr = rx.data + payload_size;
 		while (rx.endptr != rx.ptr) {
 			uint8_t data = uartReceive();
+			if (rx.timeout) break;
+
 			*rx.ptr++ = data;
 			checksum += (uint16_t)data;
 		}
+		if (rx.timeout) continue;
 
 		// apply checksum
 		checksum -= (uint16_t)uartReceive() << 8;
+		if (rx.timeout) continue;
+
 		checksum -= uartReceive();
+		if (rx.timeout) continue;
 
 		if (checksum != 0)
 			continue; // error in message

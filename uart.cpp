@@ -28,6 +28,20 @@
 
 RX rx;
 
+
+uint8_t uartReceive()
+{
+	rx.timeout = false;
+	uint16_t counter = 0;
+	while (!(UCSR0A & _BV(RXC0)))
+		if (counter++ > 2000)
+		{
+			rx.timeout = true;
+			return 0;
+		}
+	return UDR0;
+}
+
 void uartInitialize(void)
 {
 	// init RX485 line driver interface
