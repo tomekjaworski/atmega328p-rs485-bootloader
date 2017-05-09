@@ -114,7 +114,7 @@ int main(void)
 
 		if (msg_type == MessageType::Ping) // got challenge, send response -- identify itself
 		{
-			send_response(msg_type, addr, NULL, 0);
+			send_response(msg_type, addr, rx.data, payload_size);
 		}
 
 		if (msg_type == MessageType::Reboot) { // restart whole device
@@ -154,11 +154,9 @@ int main(void)
 
 			#define STR_HELPER(x) #x
 			#define STR(x) STR_HELPER(x)
-
+			#define NOP asm volatile("nop");
 			char ver[] = "v=" STR(PROTOCOL_VERSION) ";d=" __DATE__ ";t=" __TIME__;
 			send_response(msg_type, addr, (const uint8_t*)ver, sizeof(ver));
-			
-
 			#undef STR_HELPER
 			#undef STR
 		}

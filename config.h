@@ -25,6 +25,6 @@
 
 //
 // Bootloader Protocol Version
-#define PROTOCOL_VERSION 2
+#define PROTOCOL_VERSION 3
 
 #endif /* CONFIG_H_ */
