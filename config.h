@@ -20,7 +20,7 @@
 //
 // advertisement wait time [ms] - time that bootloader spends waiting for C&C software to send the activation byte.
 // If the time given in ADVERTISEMENT_WAIT_TIME passes, bootloader jumps into user space code - addr 0x0000
-#define ADVERTISEMENT_WAIT_TIME	2000
+#define ADVERTISEMENT_WAIT_TIME	15000
 
 
 //
