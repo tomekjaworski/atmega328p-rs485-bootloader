@@ -18,8 +18,14 @@ FUSES =
 	.high = (FUSE_SPIEN & FUSE_EESAVE & FUSE_BOOTRST & FUSE_BOOTSZ0 & FUSE_BOOTSZ1 ),
 #else
 	// RELEASE
-	// 512 words for bootloader
-	.high = (FUSE_SPIEN & FUSE_EESAVE & FUSE_BOOTRST & FUSE_BOOTSZ0 /*& FUSE_BOOTSZ1*/ ),
+	// 512 words for bootloader; 512 words = 1024 bytes
+	// entry point .text=0x3E00
+	//.high = (FUSE_SPIEN & FUSE_EESAVE & FUSE_BOOTRST & FUSE_BOOTSZ0 /*& FUSE_BOOTSZ1*/ ),
+
+	// 1024 words for bootloader; 1024 word = 2048 bytes;
+	// entry point: 0x3C00 (byte 0x7800)
+	.high = (FUSE_SPIEN & FUSE_EESAVE & FUSE_BOOTRST & /*FUSE_BOOTSZ0 &*/ FUSE_BOOTSZ1 ),
+
 #endif
 	.extended = FUSE_BODLEVEL0 & FUSE_BODLEVEL1,
 };
