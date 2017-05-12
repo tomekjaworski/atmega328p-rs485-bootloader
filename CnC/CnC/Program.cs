@@ -12,10 +12,10 @@ using System.Threading.Tasks;
 namespace CnC
 {
 
-    class Program
+    class ____________Program
     {
         static Random random;
-        static void Main(string[] args)
+        static void ___________Main(string[] args)
         {
             Console.WriteLine("SmartTable bootloader C&C software by Tomasz Jaworski");
             random = new Random();

@@ -57,6 +57,7 @@
     <Compile Include="MemoryVerificationException.cs" />
     <Compile Include="Message.cs" />
     <Compile Include="MessageType.cs" />
+    <Compile Include="ProgramTest.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

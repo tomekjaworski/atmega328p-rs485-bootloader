@@ -76,6 +76,20 @@ namespace CnC
             }
         }
 
+        public bool Reset(Device dev)
+        {
+            Console.Write("Rebooting {0:X2}... ", dev.address);
+            Message reboot_message = new Message((byte)dev.address, MessageType.Reboot);
+            Message msg = SendAndWaitForResponse(dev, reboot_message, 200, false);
+
+            if (msg != null)
+                Console.WriteLine("Ok.");
+            else
+                Console.WriteLine("Failed.");
+
+            return msg != null;
+        }
+
         public bool Ping(Device dev, int timeout)
         {
             int x = this.random.Next();
@@ -472,6 +486,10 @@ namespace CnC
                     catch (TimeoutException tex) {
                         Debug.WriteLine("TO");
                         continue; // ignore timeouts
+                    }
+                    catch (Exception ex) {
+                        Debug.WriteLine("EX");
+                        break; // shit happens
                     }
 
                     Debug.WriteLine("R " + read.ToString());

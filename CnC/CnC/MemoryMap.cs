@@ -33,6 +33,25 @@ namespace CnC
             this.mem[address] = data;
             this.dirty[address] = true;
         }
+
+        public int FindSequence(byte[] pattern)
+        {
+            for (int i = 0; i < mem.Length; i++) {
+                {
+                    bool match = true;
+                    for (int j = 0; j < pattern.Length; j++)
+                        if (mem[i + j] != pattern[j]) {
+                            match = false;
+                            break;
+                        }
+                    if (match)
+                        return i;
+                }
+            }
+
+            return -1;
+        }
+
         public void Write(UInt32 address, UInt16 data)
         {
             byte b0 = (byte)(data & 0xFF);
